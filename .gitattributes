@@ -1,0 +1,24 @@
+# 全仓库统一 LF，避免 Windows 上 core.autocrlf 造成的整文件换行翻转
+* text=auto eol=lf
+
+# 明确按文本处理（便于 diff 与审查）
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+
+# 二进制资源：不做换行转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+
+# 第三方压缩产物：不让 Git diff 展开成噪音
+*.min.js  -diff
+*.min.css -diff

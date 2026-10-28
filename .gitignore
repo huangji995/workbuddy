@@ -1,0 +1,48 @@
+# ---------- 系统垃圾 ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ---------- 编辑器 / IDE ----------
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+# 编辑器保存时生成的临时副本
+*.bak
+*.orig
+
+# ---------- 自测与截图产物 ----------
+# scripts/probe.mjs 输出到项目外的 .shots/，这里兜底防止误放
+.shots/
+*.png
+*.jpg
+# 但保留文档中可能引用的图标目录
+!assets/img/*.png
+
+# ---------- 临时文件与日志 ----------
+*.log
+npm-debug.log*
+yarn-error.log*
+*.tmp
+*.temp
+.cache/
+tmp/
+
+# ---------- Node（本仓库零构建，仅防误装）----------
+node_modules
+package-lock.json
+yarn.lock
+
+# ---------- 数据构建中途产物 ----------
+# build-geo.mjs 若中途失败可能留下半成品
+scripts/*.part
+scripts/*.tmp
