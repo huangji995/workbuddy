@@ -20,24 +20,17 @@
     return v.toFixed(1);
   }
 
-  function heroCopy(key, m) {
-    var v0 = U.fmt(m.base.value, 1);
-    var v1 = U.fmt(m.last.value, 1);
+  /* 大数字这一块只说“起点 → 今天”这一件事，不再重复读数：数字本身已经是读数 */
+  function heroCopy(key) {
     if (key === 'u5mr') {
       return {
         unit: '‰',
-        eraA: m.base.year + ' 年',
-        lineA: '每 1000 个活产儿里，有 <b id="stLineNum">' + v0 + '</b> 个没能活过五岁',
-        eraB: m.last.year + ' 年',
-        lineB: '今天，这个数字是 <b>' + v1 + '</b>'
+        cap: '每 1000 个活产儿里，有多少没能活过五岁。'
       };
     }
     return {
       unit: '岁',
-      eraA: m.base.year + ' 年',
-      lineA: '那一年，这里的人平均活到 <b id="stLineNum">' + v0 + '</b> 岁',
-      eraB: m.last.year + ' 年',
-      lineB: '今天，这个数字是 <b>' + v1 + '</b> 岁'
+      cap: '出生时预期寿命，一个人平均能活多少年。'
     };
   }
 
@@ -127,9 +120,14 @@
     /* ---------- 主指标 ---------- */
     var heroKey = c.u5mr ? 'u5mr' : 'lifeExp';
     var heroM = c[heroKey];
-    var copy = heroCopy(heroKey, heroM);
+    var copy = heroCopy(heroKey);
     var lastVal = heroM.last.value;
     var baseVal = heroM.base.value;
+    var baseYear = heroM.base.year;
+    var lastYear = heroM.last.year;
+    /* 变好还是变差：寿命看涨，儿童死亡看跌 */
+    var improved = heroKey === 'u5mr' ? lastVal < baseVal : lastVal > baseVal;
+    var trend = improved ? 'up' : 'down';
 
     /* ---------- 文案 ---------- */
     var nameZh = esc(c.nameZh);
@@ -147,7 +145,7 @@
     };
 
     mount.innerHTML = ''
-      + '<section class="story" id="story" data-state="0">'
+      + '<section class="story" id="story" data-state="0" data-trend="' + trend + '">'
       + '  <nav class="story-nav">'
       + '    <a class="story-back" href="#/">← 返回地图</a>'
       + '    <span class="story-id"><b>' + nameZh + '</b><em>' + esc(c.region || '') + '</em></span>'
@@ -155,11 +153,22 @@
       + '  <div class="story-stage" id="storyStage">'
       + '    <div class="st-layer st-num">'
       + '      <div class="st-inner">'
-      + '        <p class="st-era"><span class="st-era-a">' + copy.eraA + '</span>'
-      + '          <span class="st-era-b">' + copy.eraB + '</span></p>'
-      + '        <div class="st-big"><b id="stBig">' + U.fmt(baseVal, 1) + '</b></div>'
-      + '        <p class="st-line"><span class="st-line-a">' + copy.lineA + '</span>'
-      + '          <span class="st-line-b">' + copy.lineB + '</span></p>'
+      + '        <div class="st-cmp">'
+      // 起点：小字号，先把锚点交代清楚
+      + '          <p class="st-from"><span class="st-from-k">' + baseYear + ' 年</span>'
+      + '            <span class="st-from-v">' + U.fmt(baseVal, 1) + '<em>' + copy.unit + '</em></span></p>'
+      // 中间：青色发光的坠落线，把上下两段连起来
+      + '          <span class="st-drop" aria-hidden="true"><i class="st-drop-line"></i>'
+      + '            <i class="st-drop-arrow">↓</i></span>'
+      // 终点：年份随数字一起跳，落定后亮起“今天”
+      + '          <div class="st-to">'
+      + '            <p class="st-tick"><b id="stYear">' + baseYear + '</b><em>年</em>'
+      + '              <span class="st-tick-now">今天</span></p>'
+      + '            <div class="st-big"><b id="stBig">' + U.fmt(baseVal, 1) + '</b>'
+      + '              <i class="st-unit">' + copy.unit + '</i></div>'
+      + '          </div>'
+      + '        </div>'
+      + '        <p class="st-line">' + copy.cap + '</p>'
       + '        <p class="st-hint" aria-hidden="true">向下滚动<span class="st-chev">↓</span></p>'
       + '      </div>'
       + '    </div>'
@@ -192,44 +201,58 @@
     var story = mount.querySelector('#story');
     var stage = mount.querySelector('#storyStage');
     var bigEl = mount.querySelector('#stBig');
-    var lineNum = mount.querySelector('#stLineNum');
+    var yearEl = mount.querySelector('#stYear');
 
-    /* ---------- 数字：count-up，真实终值始终在 DOM 里 ---------- */
+    /* ---------- 数字：先停 0.5s 让人看清起点，再用 3s 落下来 ---------- */
+    /* 这一年 / 这十年的读数要能被看清，所以节奏比一般 count-up 慢一倍，
+       缓动也换成进出都慢的 easeInOutCubic，像数字在往下坠。 */
+    var PAUSE = 500;
+    var DUR = 3000;
+
     var curVal = baseVal;
     var settled = false;
     var numRaf = null;
 
     function setNum(v) {
       curVal = v;
-      var t = numText(v);
-      if (bigEl) bigEl.textContent = t;
-      if (lineNum) lineNum.textContent = t;
+      if (bigEl) bigEl.textContent = numText(v);
+    }
+
+    function setYear(y) {
+      if (yearEl) yearEl.textContent = String(y);
     }
 
     function settle() {
       settled = true;
+      story.classList.remove('is-rolling');
       story.classList.add('is-settled');
       setNum(lastVal);
+      setYear(lastYear);
     }
 
     function resetNum() {
       settled = false;
-      story.classList.remove('is-settled');
+      story.classList.remove('is-settled', 'is-rolling');
       if (numRaf) { cancelAnimationFrame(numRaf); numRaf = null; }
       setNum(baseVal);
+      setYear(baseYear);
     }
 
     function tweenNum(to) {
-      if (numRaf) cancelAnimationFrame(numRaf);
+      if (numRaf) { cancelAnimationFrame(numRaf); numRaf = null; }
       if (DECOR) { settle(); return; }
       var from = curVal;
       var t0 = 0;
-      var dur = 1600;
+      story.classList.remove('is-settled');
+      story.classList.add('is-rolling');
       function step(ts) {
         if (!t0) t0 = ts;
-        var t = Math.min(1, (ts - t0) / dur);
-        var e = 1 - Math.pow(1 - t, 3);
+        var el = ts - t0;
+        if (el < PAUSE) { numRaf = requestAnimationFrame(step); return; }   // 停顿：数字停在起点不动
+        var t = Math.min(1, (el - PAUSE) / DUR);
+        var e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         setNum(from + (to - from) * e);
+        setYear(Math.round(baseYear + (lastYear - baseYear) * e));
         if (t < 1) numRaf = requestAnimationFrame(step);
         else { numRaf = null; settle(); }
       }
@@ -318,11 +341,13 @@
       story.dataset.state = String(s);
 
       if (s === 0) {
-        if (settled) resetNum();
+        if (settled || numRaf) resetNum();
       } else if (s === 1) {
-        if (!settled) tweenNum(lastVal);
-      } else if (!settled) {
-        settle();            // 一步跨到这里（快速跳转）时直接落定
+        if (!settled && !numRaf) tweenNum(lastVal);
+      } else if (!settled && !numRaf) {
+        /* 一路跳到第 3 屏、跳动还没开始：直接落定。
+           但如果正在坠落，就让它把 3 秒走完，不掐断。 */
+        settle();
       }
 
       if (s === 2) {
