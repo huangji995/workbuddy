@@ -56,7 +56,7 @@
     var showX = cfg.showXAxis !== false;
     var m = { l: 46, r: 20, t: 14, b: showX ? 26 : 8 };
     // 绘图区高度固定：上下两张小多图才能沿时间轴严格对齐
-    var ih = 160;
+    var ih = cfg.plotHeight || 160;
     var H = m.t + ih + m.b;
     var iw = W - m.l - m.r;
 
@@ -80,10 +80,10 @@
     // 水平网格 + y 轴刻度
     tickValues(y0, y1, 4).forEach(function (v) {
       var y = sy(v);
-      svg.appendChild(node('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y, stroke: '#ECEAE5', 'stroke-width': 1 }));
+      svg.appendChild(node('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y, stroke: 'rgba(148,197,214,0.10)', 'stroke-width': 1 }));
       svg.appendChild(node('text', {
         x: m.l - 8, y: y + 3.5, 'text-anchor': 'end',
-        'font-size': 11, fill: '#8A8F95', 'font-variant-numeric': 'tabular-nums'
+        'font-size': 10, fill: '#64748B', 'font-variant-numeric': 'tabular-nums'
       }, cfg.yFormat ? cfg.yFormat(v) : String(v)));
     });
 
@@ -91,14 +91,14 @@
     if (cfg.baseYear && cfg.baseYear > yr0 && cfg.baseYear < yr1) {
       svg.appendChild(node('line', {
         x1: sx(cfg.baseYear), x2: sx(cfg.baseYear), y1: m.t, y2: m.t + ih,
-        stroke: '#C9C5BC', 'stroke-width': 1, 'stroke-dasharray': '3 4'
+        stroke: 'rgba(6,181,212,0.40)', 'stroke-width': 1, 'stroke-dasharray': '3 4'
       }));
     }
 
     // x 轴：轴线两张图都画（便于上下对齐），年份标签只给最下面那张
     svg.appendChild(node('line', {
       x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih,
-      stroke: showX ? '#D9D5CC' : '#EAE7E0', 'stroke-width': 1
+      stroke: showX ? 'rgba(148,197,214,0.24)' : 'rgba(148,197,214,0.10)', 'stroke-width': 1
     }));
     if (showX) {
       var step = spanX > 40 ? 10 : spanX > 14 ? 5 : 2;
@@ -108,12 +108,12 @@
       var start = Math.ceil(yr0 / step) * step;
       for (var yv = start; yv <= yr1; yv += step) {
         svg.appendChild(node('text', {
-          x: sx(yv), y: m.t + ih + 19, 'text-anchor': 'middle', 'font-size': 11, fill: '#8A8F95'
+          x: sx(yv), y: m.t + ih + 19, 'text-anchor': 'middle', 'font-size': 10, fill: '#64748B'
         }, String(yv)));
       }
     }
 
-    // 折线（按缺口分段）
+    // 折线（按缺口分段）：先铺一层半透明粗线做辉光，再画主线
     var segs = splitSegments(series);
     segs.forEach(function (seg) {
       var d = '';
@@ -121,7 +121,11 @@
         d += (i ? 'L' : 'M') + sx(p[0]).toFixed(2) + ' ' + sy(p[1]).toFixed(2);
       });
       svg.appendChild(node('path', {
-        d: d, fill: 'none', stroke: cfg.color, 'stroke-width': 2,
+        d: d, fill: 'none', stroke: cfg.color, 'stroke-width': 7,
+        'stroke-opacity': 0.14, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+      }));
+      svg.appendChild(node('path', {
+        d: d, fill: 'none', stroke: cfg.color, 'stroke-width': 1.8,
         'stroke-linejoin': 'round', 'stroke-linecap': 'round'
       }));
     });
@@ -129,7 +133,7 @@
     // 首尾点
     var first = series[0];
     var last = series[series.length - 1];
-    svg.appendChild(node('circle', { cx: sx(first[0]), cy: sy(first[1]), r: 2.6, fill: '#fff', stroke: cfg.color, 'stroke-width': 1.6 }));
+    svg.appendChild(node('circle', { cx: sx(first[0]), cy: sy(first[1]), r: 2.6, fill: '#020617', stroke: cfg.color, 'stroke-width': 1.6 }));
     svg.appendChild(node('circle', { cx: sx(last[0]), cy: sy(last[1]), r: 3.2, fill: cfg.color }));
 
     // 尾值标注
@@ -148,8 +152,8 @@
 
     // 指针读数
     var cursor = node('g', { opacity: 0, 'pointer-events': 'none' });
-    var vLine = node('line', { y1: m.t, y2: m.t + ih, stroke: '#6B6F76', 'stroke-width': 1, 'stroke-dasharray': '2 3' });
-    var dot = node('circle', { r: 4, fill: cfg.color, stroke: '#fff', 'stroke-width': 1.6 });
+    var vLine = node('line', { y1: m.t, y2: m.t + ih, stroke: 'rgba(148,197,214,0.45)', 'stroke-width': 1, 'stroke-dasharray': '2 3' });
+    var dot = node('circle', { r: 4, fill: cfg.color, stroke: '#020617', 'stroke-width': 1.6 });
     cursor.appendChild(vLine);
     cursor.appendChild(dot);
     svg.appendChild(cursor);

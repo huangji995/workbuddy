@@ -4,8 +4,10 @@
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
 
-  var OCEAN = '#E9EDEA';
-  var BORDER = 'rgba(255,255,255,0.62)';
+  var OCEAN = 'rgba(6, 16, 32, 0.76)';     // 深色半透明：透出舞台背景
+  var BORDER = 'rgba(2, 6, 23, 0.62)';     // 陆块之间用暗缝分隔
+  var GRAT = 'rgba(34, 211, 238, 0.12)';   // 经纬线：暗青
+  var RIM = '34, 211, 238';                // 边缘外发光
   var DEG = 180 / Math.PI;
 
   GPM.globe = {
@@ -55,7 +57,7 @@
         canvas.width = Math.round(W * dpr);
         canvas.height = Math.round(H * dpr);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        R = Math.min(W, H) / 2 - 6;
+        R = Math.min(W, H) / 2 - 14;   // 留出边缘外发光的余量
         proj.translate([W / 2, H / 2]).scale(R);
         dirty = true;
       }
@@ -69,16 +71,17 @@
         proj.rotate(rot);
         ctx.clearRect(0, 0, W, H);
 
-        // 大气光晕（圆外一圈，先画，被球体压住内侧）
-        var ag = ctx.createRadialGradient(cx, cy, R * 0.94, cx, cy, R * 1.1);
-        ag.addColorStop(0, 'rgba(122,150,168,0.20)');
-        ag.addColorStop(1, 'rgba(122,150,168,0)');
+        // 大气光晕：圆外一圈青色，先画，被球体压住内侧
+        var ag = ctx.createRadialGradient(cx, cy, R * 0.97, cx, cy, R * 1.22);
+        ag.addColorStop(0, 'rgba(' + RIM + ',0.20)');
+        ag.addColorStop(0.45, 'rgba(' + RIM + ',0.07)');
+        ag.addColorStop(1, 'rgba(' + RIM + ',0)');
         ctx.beginPath();
-        ctx.arc(cx, cy, R * 1.1, 0, Math.PI * 2);
+        ctx.arc(cx, cy, R * 1.22, 0, Math.PI * 2);
         ctx.fillStyle = ag;
         ctx.fill();
 
-        // 海洋
+        // 海洋：半透明深色，背景网格会微微透出来
         ctx.beginPath();
         path(sphere);
         ctx.fillStyle = OCEAN;
@@ -87,7 +90,7 @@
         // 经纬网
         ctx.beginPath();
         path(graticule);
-        ctx.strokeStyle = 'rgba(120,132,138,0.16)';
+        ctx.strokeStyle = GRAT;
         ctx.lineWidth = 0.6;
         ctx.stroke();
 
@@ -107,36 +110,52 @@
           ctx.stroke();
         }
 
-        // 球面明暗：左上高光 + 边缘压暗，3D 感主要靠这一层
+        // 球面明暗：冷光高光 + 边压暗 + 整体压暗，让数据色沉下去
         ctx.save();
         ctx.beginPath();
         path(sphere);
         ctx.clip();
-        var sg = ctx.createRadialGradient(cx - R * 0.38, cy - R * 0.42, R * 0.05, cx, cy, R * 1.04);
-        sg.addColorStop(0, 'rgba(255,255,255,0.30)');
-        sg.addColorStop(0.45, 'rgba(255,255,255,0.02)');
-        sg.addColorStop(1, 'rgba(45,36,26,0.28)');
+        var sg = ctx.createRadialGradient(cx - R * 0.38, cy - R * 0.44, R * 0.05, cx, cy, R * 1.06);
+        sg.addColorStop(0, 'rgba(160, 240, 255, 0.08)');
+        sg.addColorStop(0.42, 'rgba(2, 6, 23, 0.16)');
+        sg.addColorStop(1, 'rgba(2, 6, 23, 0.70)');
         ctx.fillStyle = sg;
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.20)';
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
 
-        // 地平线
+        // 边缘：一圈青色外发光 + 一道冷白细线
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(cx, cy, R, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(45,36,26,0.10)';
-        ctx.lineWidth = 1;
+        ctx.arc(cx, cy, R - 0.5, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(' + RIM + ',0.45)';
+        ctx.lineWidth = 1.2;
+        ctx.shadowColor = 'rgba(' + RIM + ',0.85)';
+        ctx.shadowBlur = 18;
         ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R - 2, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(190, 245, 255, 0.34)';
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+        ctx.restore();
 
         // 悬停国家描边（画在最上层，不受明暗影响）
         if (hovered) {
           var h = null;
           for (var k = 0; k < items.length; k++) if (items[k].iso2 === hovered) { h = items[k]; break; }
           if (h) {
+            ctx.save();
             ctx.beginPath();
             path(h.feature);
-            ctx.strokeStyle = '#2B2620';
+            ctx.strokeStyle = '#67E8F9';
             ctx.lineWidth = 1.4;
+            ctx.shadowColor = 'rgba(34, 211, 238, 0.9)';
+            ctx.shadowBlur = 10;
             ctx.stroke();
+            ctx.restore();
           }
         }
       }

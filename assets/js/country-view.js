@@ -1,8 +1,12 @@
-/* 国家详情：起点 vs 现在对比卡 + 两张共用时间轴的趋势图 */
+/* 国家详情：全屏滚动叙事。
+   sticky 画布 + 步进文字，IntersectionObserver 触发离散状态；
+   状态间只用 transform / opacity 过渡，不碰布局属性。 */
 (function () {
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
   var U = GPM.util;
+
+  var DECOR = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
@@ -10,42 +14,31 @@
     });
   }
 
-  function yearLabel(m) {
-    return m.base.year === 1990 ? '1990' : m.base.year + '（1990 无数据）';
+  /** 大数字的显示格式：上百取整，小值保留一位 */
+  function numText(v) {
+    if (v >= 100) return String(Math.round(v));
+    return v.toFixed(1);
   }
 
-  function cardHTML(c, key, ind) {
-    var m = c[key];
-    if (!m) {
-      return '<article class="cmp-card is-empty">'
-        + '<div class="cmp-head"><h2>' + ind.label + '</h2><span class="cmp-unit">' + ind.unit + '</span></div>'
-        + '<p class="cmp-none">暂无数据</p>'
-        + '<p class="cmp-foot">世界银行 WDI 未收录该地区的此项指标。</p>'
-        + '</article>';
+  function heroCopy(key, m) {
+    var v0 = U.fmt(m.base.value, 1);
+    var v1 = U.fmt(m.last.value, 1);
+    if (key === 'u5mr') {
+      return {
+        unit: '‰',
+        eraA: m.base.year + ' 年',
+        lineA: '每 1000 个活产儿里，有 <b id="stLineNum">' + v0 + '</b> 个没能活过五岁',
+        eraB: m.last.year + ' 年',
+        lineB: '今天，这个数字是 <b>' + v1 + '</b>'
+      };
     }
-    var better = ind.betterWhen === 'down' ? m.delta < 0 : m.delta > 0;
-    var dir = m.delta < 0 ? '↓' : m.delta > 0 ? '↑' : '→';
-    var absDelta = Math.abs(m.delta);
-    var deltaText = ind.betterWhen === 'down'
-      ? (m.delta < 0 ? '减少 ' : '增加 ') + U.fmt(absDelta, 1)
-      : (m.delta > 0 ? '增加 ' : '减少 ') + U.fmt(absDelta, 1);
-    var extra = ind.betterWhen === 'down' ? '（越少越好）' : '（越多越好）';
-
-    return '<article class="cmp-card">'
-      + '<div class="cmp-head"><h2>' + ind.label + '</h2><span class="cmp-unit">' + ind.unit + '</span></div>'
-      + '<div class="cmp-body">'
-      + '  <div class="cmp-point"><span class="cmp-year">' + esc(yearLabel(m)) + '</span>'
-      + '    <span class="cmp-value">' + U.fmt(m.base.value, ind.decimals) + '</span>'
-      + '    <span class="cmp-tag">起点</span></div>'
-      + '  <div class="cmp-arrow" aria-hidden="true">→</div>'
-      + '  <div class="cmp-point is-now"><span class="cmp-year">' + m.last.year + '</span>'
-      + '    <span class="cmp-value">' + U.fmt(m.last.value, ind.decimals) + '</span>'
-      + '    <span class="cmp-tag">最近</span></div>'
-      + '</div>'
-      + '<p class="cmp-foot"><span class="cmp-delta ' + (better ? 'is-good' : 'is-bad') + '">'
-      + dir + ' ' + deltaText + ' ' + extra + '</span>'
-      + '<span class="cmp-pct">' + (m.deltaPct === null ? '' : U.pctText(m.deltaPct)) + '</span></p>'
-      + '</article>';
+    return {
+      unit: '岁',
+      eraA: m.base.year + ' 年',
+      lineA: '那一年，这里的人平均活到 <b id="stLineNum">' + v0 + '</b> 岁',
+      eraB: m.last.year + ' 年',
+      lineB: '今天，这个数字是 <b>' + v1 + '</b> 岁'
+    };
   }
 
   function domainFor(series, key) {
@@ -59,29 +52,38 @@
     return [Math.max(0, Math.floor((min - 2) / 5) * 5), Math.ceil((max + 2) / 5) * 5];
   }
 
-  function trendBlock(c, key, ind) {
-    var head = '<div class="trend-head"><h2>' + ind.label + '</h2><span>' + ind.unit + '</span></div>';
-    if (!c[key]) {
-      return head + '<p class="trend-empty">暂无数据：世界银行 WDI 未收录该指标，所以这里没有趋势线。</p>';
-    }
-    return head + '<div class="chart" id="chart-' + key + '"></div>';
+  function deltaText(key, m) {
+    if (!m || m.deltaPct === null || m.deltaPct === undefined) return '';
+    var pct = m.deltaPct;
+    if (key === 'u5mr') return (pct <= 0 ? '−' : '+') + Math.abs(pct).toFixed(0) + '%';
+    return (m.delta >= 0 ? '+' : '−') + U.fmt(Math.abs(m.delta), 1) + ' 岁';
   }
 
-  function tableHTML(c, ind) {
-    var a = c.u5mr ? c.u5mr.series : [];
-    var b = c.lifeExp ? c.lifeExp.series : [];
+  function chartBlock(key, ind, m, suffix) {
+    return '<div class="st-chart">'
+      + '<div class="st-chart-head">'
+      + '  <span class="st-chart-name">' + ind.label + ' · ' + ind.unit + '</span>'
+      + '  <span class="st-chart-delta">' + deltaText(key, m) + '</span>'
+      + '</div>'
+      + '<div class="chart" id="chart-' + suffix + '-' + key + '"></div>'
+      + '</div>';
+  }
+
+  function tableHTML(c, indU, indL) {
     var map = {};
-    a.forEach(function (p) { (map[p[0]] = map[p[0]] || {})[ind[0]] = p[1]; });
-    b.forEach(function (p) { (map[p[0]] = map[p[0]] || {})[ind[1]] = p[1]; });
+    (c.u5mr ? c.u5mr.series : []).forEach(function (p) { (map[p[0]] = map[p[0]] || {}).u5mr = p[1]; });
+    (c.lifeExp ? c.lifeExp.series : []).forEach(function (p) { (map[p[0]] = map[p[0]] || {}).le = p[1]; });
     var years = Object.keys(map).map(Number).sort(function (x, y) { return x - y; });
-    var rows = years.filter(function (y) { return y % 5 === 0 || y === years[years.length - 1]; })
+    if (!years.length) return '';
+    var rows = years.filter(function (y, i) { return y % 5 === 0 || i === years.length - 1; })
       .map(function (y) {
         var r = map[y];
-        return '<tr><td>' + y + '</td><td>' + (r.u5mr === undefined ? '—' : U.fmt(r.u5mr, 1)) + '</td>'
-          + '<td>' + (r.lifeExp === undefined ? '—' : U.fmt(r.lifeExp, 1)) + '</td></tr>';
+        return '<tr><td>' + y + '</td>'
+          + '<td>' + (r.u5mr === undefined ? '—' : U.fmt(r.u5mr, 1)) + '</td>'
+          + '<td>' + (r.le === undefined ? '—' : U.fmt(r.le, 1)) + '</td></tr>';
       }).join('');
     return '<details class="data-table"><summary>以数据表查看（每 5 年）</summary>'
-      + '<table><thead><tr><th>年份</th><th>5岁以下儿童死亡率</th><th>出生时预期寿命</th></tr></thead>'
+      + '<table><thead><tr><th>年份</th><th>' + indU.label + '</th><th>' + indL.label + '</th></tr></thead>'
       + '<tbody>' + rows + '</tbody></table></details>';
   }
 
@@ -104,71 +106,279 @@
       return function () { mount.innerHTML = ''; };
     }
 
-    var hasAny = !!(c.u5mr || c.lifeExp);
-    var meta = [c.nameEn, c.region].filter(Boolean).join(' · ');
+    var hasHero = !!(c.u5mr || c.lifeExp);
+    var hasBubble = !!(window.__GPM_BUBBLE__ && window.__GPM_BUBBLE__.gdp[iso2]);
 
-    var noticeHTML = hasAny ? '' :
-      '<div class="notice"><strong>这个地区没有可展示的数据。</strong>'
-      + '<p>世界银行 WDI 未收录' + esc(c.nameZh) + '的 5 岁以下儿童死亡率与出生时预期寿命，'
-      + '所以这里不做任何估算或填充，地图上也保持中性灰。</p>'
-      + '<p class="notice-more">本页共收录 ' + D.meta.countriesTotal + ' 个国家与地区，'
-      + '其中 ' + D.meta.countriesWithData + ' 个有儿童死亡率数据。'
-      + '<a class="notice-link" href="#/">回到地图选一个 →</a></p></div>';
+    if (!hasHero) {
+      mount.innerHTML = '<section class="view view-country story-plain">'
+        + '<a class="back" href="#/">← 返回地图</a>'
+        + '<header class="country-head"><h1>' + esc(c.nameZh) + '</h1>'
+        + '<p class="country-meta">' + esc([c.nameEn, c.region].filter(Boolean).join(' · ')) + '</p></header>'
+        + '<div class="notice"><strong>这个地区没有可展示的数据。</strong>'
+        + '<p>世界银行 WDI 未收录' + esc(c.nameZh) + '的 5 岁以下儿童死亡率与出生时预期寿命，'
+        + '所以这里不做任何估算或填充，地图上也保持中性灰。</p>'
+        + '<p class="notice-more">本页共收录 ' + D.meta.countriesTotal + ' 个国家与地区，其中 '
+        + D.meta.countriesWithData + ' 个有儿童死亡率数据。'
+        + '<a class="notice-link" href="#/">回到地图选一个 →</a></p></div>'
+        + '</section>';
+      return function () { mount.innerHTML = ''; };
+    }
+
+    /* ---------- 主指标 ---------- */
+    var heroKey = c.u5mr ? 'u5mr' : 'lifeExp';
+    var heroM = c[heroKey];
+    var copy = heroCopy(heroKey, heroM);
+    var lastVal = heroM.last.value;
+    var baseVal = heroM.base.value;
+
+    /* ---------- 文案 ---------- */
+    var nameZh = esc(c.nameZh);
+    var cap1 = '这条线上的每一个点，都是一年真实观测。没有估算，也没有插值。';
+    var cap2 = heroKey === 'u5mr'
+      ? '上面那条往下走，下面那条往上走。它们是同一件事的两面：孩子活下来了，人也就活得更久。'
+      : '上面那条往下走，下面那条往上走。死亡在退，寿命在长——同一件事的两面。';
+    var cap3 = '把' + nameZh + '放回世界的坐标里：横轴人均收入，纵轴预期寿命，每个气泡是一个国家。'
+      + '按下播放，看这一整片气泡怎么挪。';
+
+    /* ---------- 结构 ---------- */
+    var chartsHTML = function (suffix) {
+      return (c.u5mr ? chartBlock('u5mr', indU, c.u5mr, suffix) : '')
+        + (c.lifeExp ? chartBlock('lifeExp', indL, c.lifeExp, suffix) : '');
+    };
 
     mount.innerHTML = ''
-      + '<section class="view view-country">'
-      + '  <a class="back" href="#/">← 返回地图</a>'
-      + '  <header class="country-head">'
-      + '    <h1>' + esc(c.nameZh) + '</h1>'
-      + '    <p class="country-meta">' + esc(meta) + '</p>'
-      + '  </header>'
-      + noticeHTML
-      + (hasAny ? '<div class="cmp-grid">' + cardHTML(c, 'u5mr', indU) + cardHTML(c, 'lifeExp', indL) + '</div>' : '')
-      + (hasAny ? '<section class="trend">'
-        + trendBlock(c, 'u5mr', indU)
-        + trendBlock(c, 'lifeExp', indL)
-        + '<p class="chart-note">两张图共用同一条时间轴，纵向可直接对齐比较。缺失年份处折线断开，不做插值。</p>'
-        + (hasAny ? tableHTML(c, ['u5mr', 'lifeExp']) : '')
-        + '</section>' : '')
-      + '  <footer class="view-foot">数据：World Bank WDI'
-      + footCodes(c) + ' · 快照日期 ' + D.meta.generatedAt + '</footer>'
+      + '<section class="story" id="story" data-state="0">'
+      + '  <nav class="story-nav">'
+      + '    <a class="story-back" href="#/">← 返回地图</a>'
+      + '    <span class="story-id"><b>' + nameZh + '</b><em>' + esc(c.region || '') + '</em></span>'
+      + '  </nav>'
+      + '  <div class="story-stage" id="storyStage">'
+      + '    <div class="st-layer st-num">'
+      + '      <div class="st-inner">'
+      + '        <p class="st-era"><span class="st-era-a">' + copy.eraA + '</span>'
+      + '          <span class="st-era-b">' + copy.eraB + '</span></p>'
+      + '        <div class="st-big"><b id="stBig">' + U.fmt(baseVal, 1) + '</b></div>'
+      + '        <p class="st-line"><span class="st-line-a">' + copy.lineA + '</span>'
+      + '          <span class="st-line-b">' + copy.lineB + '</span></p>'
+      + '        <p class="st-hint" aria-hidden="true">向下滚动<span class="st-chev">↓</span></p>'
+      + '      </div>'
+      + '    </div>'
+      + '    <div class="st-layer st-charts">'
+      + '      <div class="st-inner">' + chartsHTML('side') + '</div>'
+      + '    </div>'
+      + '    <div class="st-layer st-bubble">'
+      + '      <div class="st-inner"><div class="bub-root" id="bubRoot"></div></div>'
+      + '    </div>'
+      + '  </div>'
+      + '  <div class="story-steps">'
+      + '    <div class="st-step" data-step="0" aria-hidden="true"></div>'
+      + '    <div class="st-step" data-step="1"><p class="st-cap">' + cap1 + '</p></div>'
+      + '    <div class="st-step" data-step="2"><p class="st-cap">' + cap3 + '</p></div>'
+      + '    <div class="st-step" data-step="3" aria-hidden="true"></div>'
+      + '    <div class="st-step" data-step="4" aria-hidden="true"></div>'
+      + '  </div>'
+      + '</section>'
+      + '<section class="story-tail">'
+      + '  <div class="story-tail-in">'
+      + '    <p class="story-tail-k">' + esc(c.region || '') + ' · ' + nameZh + '</p>'
+      + '    <h2 class="story-tail-h">三十四年，一条线。</h2>'
+      + '    <p class="story-tail-p">数据来自世界银行 WDI，指标编号 ' + footCodes(c).replace(/^ · /, '')
+      + '；气泡图另用人均 GDP（PPP）与总人口。所有数值为构建时的快照，运行时不发起任何网络请求。</p>'
+      + tableHTML(c, indU, indL)
+      + '    <a class="story-tail-link" href="#/">← 回到地球</a>'
+      + '  </div>'
       + '</section>';
 
+    var story = mount.querySelector('#story');
+    var stage = mount.querySelector('#storyStage');
+    var bigEl = mount.querySelector('#stBig');
+    var lineNum = mount.querySelector('#stLineNum');
+
+    /* ---------- 数字：count-up，真实终值始终在 DOM 里 ---------- */
+    var curVal = baseVal;
+    var settled = false;
+    var numRaf = null;
+
+    function setNum(v) {
+      curVal = v;
+      var t = numText(v);
+      if (bigEl) bigEl.textContent = t;
+      if (lineNum) lineNum.textContent = t;
+    }
+
+    function settle() {
+      settled = true;
+      story.classList.add('is-settled');
+      setNum(lastVal);
+    }
+
+    function resetNum() {
+      settled = false;
+      story.classList.remove('is-settled');
+      if (numRaf) { cancelAnimationFrame(numRaf); numRaf = null; }
+      setNum(baseVal);
+    }
+
+    function tweenNum(to) {
+      if (numRaf) cancelAnimationFrame(numRaf);
+      if (DECOR) { settle(); return; }
+      var from = curVal;
+      var t0 = 0;
+      var dur = 1600;
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var t = Math.min(1, (ts - t0) / dur);
+        var e = 1 - Math.pow(1 - t, 3);
+        setNum(from + (to - from) * e);
+        if (t < 1) numRaf = requestAnimationFrame(step);
+        else { numRaf = null; settle(); }
+      }
+      numRaf = requestAnimationFrame(step);
+    }
+
+    /* ---------- 折线图：侧栏版与全宽版各画一套，各自保持原生字号 ---------- */
+    // 叙事从 1990 起算：折线也只画 1990 之后，和地图、气泡图同一个时间窗
+    function clip(ctx) {
+      return ctx.series.filter(function (p) { return p[0] >= 1990; });
+    }
+
     function drawCharts() {
+      var su = c.u5mr ? clip(c.u5mr) : null;
+      var sl = c.lifeExp ? clip(c.lifeExp) : null;
       var years = [];
-      [c.u5mr, c.lifeExp].forEach(function (m) {
-        if (m) years.push(m.series[0][0], m.series[m.series.length - 1][0]);
-      });
+      [su, sl].forEach(function (s) { if (s && s.length) years.push(s[0][0], s[s.length - 1][0]); });
       if (!years.length) return;
       var yearDomain = [Math.min.apply(null, years), Math.max.apply(null, years)];
+      var h = stage.clientHeight || window.innerHeight;
+      var nCharts = (c.u5mr ? 1 : 0) + (c.lifeExp ? 1 : 0);
+
+      // 绘图高度按这一栏实际剩下多少空间算，避免两张图挤到旁白上
+      var innerEl = mount.querySelector('.st-charts .st-inner');
+      var cs = innerEl ? window.getComputedStyle(innerEl) : null;
+      var padT = cs ? parseFloat(cs.paddingTop) || 0 : 0;
+      var padB = cs ? parseFloat(cs.paddingBottom) || 0 : 0;
+      var gap = cs ? (parseFloat(cs.rowGap) || 16) : 16;
+      var avail = (innerEl ? innerEl.clientHeight || h : h) - padT - padB;
+      var per = (avail - gap * (nCharts - 1)) / nCharts;
+      var plotH = Math.round(Math.max(64, Math.min(200, per - 52)));
 
       var blocks = [
-        { key: 'u5mr', el: mount.querySelector('#chart-u5mr'), color: '#8A3A12', ind: indU },
-        { key: 'lifeExp', el: mount.querySelector('#chart-lifeExp'), color: '#1F6F8B', ind: indL }
-      ].filter(function (b) { return b.el && c[b.key]; });
+        { key: 'u5mr', color: '#22D3EE', ind: indU, series: su },
+        { key: 'lifeExp', color: '#A78BFA', ind: indL, series: sl }
+      ].filter(function (b) { return b.series && b.series.length; });
 
-      blocks.forEach(function (b, i) {
-        var isLast = i === blocks.length - 1; // 只有最下面那张画年份刻度
-        GPM.chart.render(b.el, {
-          series: c[b.key].series,
-          color: b.color,
-          unit: b.ind.unit,
-          yearDomain: yearDomain,
-          yDomain: domainFor(c[b.key].series, b.key),
-          showXAxis: isLast,
-          baseYear: 1990,
-          valueFormat: function (v) { return U.fmt(v, 1); },
-          yFormat: function (v) { return String(Math.round(v)); },
-          ariaLabel: c.nameZh + ' ' + b.ind.label + '趋势，' + yearDomain[0] + ' 至 ' + yearDomain[1] + ' 年'
+      function draw(suffix, plotH) {
+        blocks.forEach(function (b, i) {
+          var el = mount.querySelector('#chart-' + suffix + '-' + b.key);
+          if (!el) return;
+          GPM.chart.render(el, {
+            series: b.series,
+            color: b.color,
+            unit: b.ind.unit,
+            yearDomain: yearDomain,
+            yDomain: domainFor(b.series, b.key),
+            showXAxis: i === nCharts - 1,
+            baseYear: 1990,
+            plotHeight: plotH,
+            valueFormat: function (v) { return U.fmt(v, 1); },
+            yFormat: function (v) { return String(Math.round(v)); },
+            ariaLabel: c.nameZh + b.ind.label + '趋势，' + yearDomain[0] + ' 至 ' + yearDomain[1] + ' 年'
+          });
         });
-      });
+      }
+
+      draw('side', plotH);
     }
 
     drawCharts();
-    window.addEventListener('resize', drawCharts);
+
+    /* ---------- 气泡图（懒初始化，第一次进入第 4 屏时才建） ---------- */
+    var bubble = null;
+    var bubblePlayed = false;
+
+    function ensureBubble() {
+      if (bubble || !hasBubble) return;
+      var root = mount.querySelector('#bubRoot');
+      if (!root || !root.clientHeight) return;
+      bubble = GPM.bubble.create(root, {
+        iso2: iso2,
+        nameZh: c.nameZh
+      });
+    }
+
+    /* ---------- 状态机 ---------- */
+    var curState = 0;
+
+    function applyState(s) {
+      if (s === curState) return;
+      var prev = curState;
+      curState = s;
+      story.dataset.state = String(s);
+
+      if (s === 0) {
+        if (settled) resetNum();
+      } else if (s === 1) {
+        if (!settled) tweenNum(lastVal);
+      } else if (!settled) {
+        settle();            // 一步跨到这里（快速跳转）时直接落定
+      }
+
+      if (s === 2) {
+        ensureBubble();
+        if (bubble && !bubblePlayed) { bubblePlayed = true; bubble.play(); }
+      } else if (bubble) {
+        bubble.stop();
+      }
+    }
+
+    var steps = Array.prototype.slice.call(mount.querySelectorAll('.st-step'));
+
+    var io = new IntersectionObserver(function (entries) {
+      var best = -1;
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var idx = Number(e.target.dataset.step);
+        if (idx > best) best = idx;
+      });
+      if (best < 0) {
+        // 一次跳很远时，中线可能刚好落在两段之间或故事之外：取离中线最近的那段
+        var mid = window.innerHeight / 2;
+        var bestD = Infinity;
+        steps.forEach(function (el, i) {
+          var r = el.getBoundingClientRect();
+          var d = Math.abs((r.top + r.bottom) / 2 - mid);
+          if (d < bestD) { bestD = d; best = i; }
+        });
+      }
+      if (best >= 0) applyState(Math.min(best, 2));
+    }, { rootMargin: '-50% 0px -50% 0px', threshold: 0 });
+
+    steps.forEach(function (el) { io.observe(el); });
+
+    /* ---------- 尺寸变化 ---------- */
+    var rt = null;
+    function onResize() {
+      clearTimeout(rt);
+      rt = setTimeout(function () {
+        drawCharts();
+        if (bubble) {
+          bubble.destroy();
+          bubble = null;
+          ensureBubble();
+        }
+      }, 220);
+    }
+    window.addEventListener('resize', onResize);
+
+    // 首帧之后再触发一次入场，避免和 innerHTML 同帧
+    requestAnimationFrame(function () { story.classList.add('is-in'); });
 
     return function cleanup() {
-      window.removeEventListener('resize', drawCharts);
+      clearTimeout(rt);
+      window.removeEventListener('resize', onResize);
+      io.disconnect();
+      if (numRaf) cancelAnimationFrame(numRaf);
+      if (bubble) bubble.destroy();
       mount.innerHTML = '';
     };
   };

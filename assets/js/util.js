@@ -3,11 +3,17 @@
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
 
-  // 地理单色相色阶：浅 → 深 = 数值低 → 高。无数据用中性灰，不与色阶混淆。
+  // 深色底上的顺序色阶：冷青（低，安全）→ 琥珀 → 红 → 高热玫红（高，危险）。
+  // 数值越高越「烫」，在深空底上自然形成发光感；无数据用中性蓝灰，不与色阶混淆。
   var PALETTE = {
-    colorMin: '#F8DDC6',
-    colorMax: '#6E2A0B',
-    noData: '#D9D7D1'
+    stops: [
+      { at: 0.00, hex: '#0C3340' },
+      { at: 0.36, hex: '#0F6B80' },
+      { at: 0.62, hex: '#B45309' },
+      { at: 0.84, hex: '#DC2626' },
+      { at: 1.00, hex: '#F87171' }
+    ],
+    noData: '#243244'
   };
 
   function clamp01(n) {
@@ -27,20 +33,39 @@
     return ('0' + Math.round(n).toString(16)).slice(-2);
   }
 
-  /** 逐通道混合：ratio=0 取 minHex（浅），ratio=1 取 maxHex（深） */
+  /** 逐通道混合：ratio=0 取 minHex，ratio=1 取 maxHex */
   function mix(maxHex, minHex, ratio) {
     var r = parseFloat(clamp01(ratio)).toFixed(1);
     var a = hexToRgb(maxHex);
     var b = hexToRgb(minHex);
-    var out = '#' + toHex2(Math.ceil(a[0] * r + b[0] * (1 - r)))
+    return '#' + toHex2(Math.ceil(a[0] * r + b[0] * (1 - r)))
       + toHex2(Math.ceil(a[1] * r + b[1] * (1 - r)))
       + toHex2(Math.ceil(a[2] * r + b[2] * (1 - r)));
-    return out;
   }
 
+  /** 色阶取值：t=0 冷青，t=1 高热，中间按 stops 分段线性 */
+  function rampAt(t) {
+    var s = PALETTE.stops;
+    t = clamp01(t);
+    for (var i = 1; i < s.length; i++) {
+      if (t <= s[i].at) {
+        var a = hexToRgb(s[i - 1].hex);
+        var b = hexToRgb(s[i].hex);
+        var k = (t - s[i - 1].at) / (s[i].at - s[i - 1].at || 1);
+        return [
+          Math.round(a[0] + (b[0] - a[0]) * k),
+          Math.round(a[1] + (b[1] - a[1]) * k),
+          Math.round(a[2] + (b[2] - a[2]) * k)
+        ];
+      }
+    }
+    return hexToRgb(s[s.length - 1].hex);
+  }
 
-
-
+  function rampHex(t) {
+    var c = rampAt(t);
+    return '#' + toHex2(c[0]) + toHex2(c[1]) + toHex2(c[2]);
+  }
 
   /**
    * 连续色阶：把 thresholds 当作锚点，锚点之间线性插值。
@@ -49,32 +74,30 @@
   function rampColor(value, thresholds) {
     if (value === null || value === undefined || isNaN(value)) return PALETTE.noData;
     var n = thresholds.length;
-    if (value <= thresholds[0]) return mix(PALETTE.colorMax, PALETTE.colorMin, 0);
-    if (value >= thresholds[n - 1]) return mix(PALETTE.colorMax, PALETTE.colorMin, 1);
-    for (var i = 1; i < n; i++) {
-      if (value <= thresholds[i]) {
-        var v0 = thresholds[i - 1];
-        var v1 = thresholds[i];
-        var t = (value - v0) / (v1 - v0 || 1);
-        var a = hexToRgb(mix(PALETTE.colorMax, PALETTE.colorMin, (i - 1) / (n - 1)));
-        var b = hexToRgb(mix(PALETTE.colorMax, PALETTE.colorMin, i / (n - 1)));
-        return 'rgb(' + Math.round(a[0] + (b[0] - a[0]) * t)
-          + ',' + Math.round(a[1] + (b[1] - a[1]) * t)
-          + ',' + Math.round(a[2] + (b[2] - a[2]) * t) + ')';
+    var t = 1;
+    if (value <= thresholds[0]) {
+      t = 0;
+    } else if (value < thresholds[n - 1]) {
+      for (var i = 1; i < n; i++) {
+        if (value <= thresholds[i]) {
+          var v0 = thresholds[i - 1];
+          var v1 = thresholds[i];
+          t = ((i - 1) + (value - v0) / (v1 - v0 || 1)) / (n - 1);
+          break;
+        }
       }
     }
-    return PALETTE.noData;
+    var c = rampAt(t);
+    return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
   }
 
-  /** 图例渐变条用的色标（与 rampColor 同一套锚点） */
+  /** 图例渐变条用的色标（与 rampColor 走同一条曲线） */
   function rampStops(thresholds) {
     var n = thresholds.length;
     var out = [];
     for (var i = 0; i < n; i++) {
-      out.push({
-        at: i / (n - 1),
-        color: mix(PALETTE.colorMax, PALETTE.colorMin, i / (n - 1))
-      });
+      var at = i / (n - 1);
+      out.push({ at: at, color: rampHex(at) });
     }
     return out;
   }
@@ -125,6 +148,8 @@
   GPM.util = {
     clamp01: clamp01,
     mix: mix,
+    rampAt: rampAt,
+    rampHex: rampHex,
     rampColor: rampColor,
     rampStops: rampStops,
     valueAt: valueAt,

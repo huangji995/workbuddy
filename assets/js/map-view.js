@@ -16,6 +16,26 @@
     });
   }
 
+  /* 时间轴刻度：每年一根，5 的倍数加长，两端再加一道更亮的端标 */
+  function rulerHTML() {
+    var out = '';
+    for (var y = YEAR_START; y <= YEAR_END; y++) {
+      var p = ((y - YEAR_START) / (YEAR_END - YEAR_START)) * 100;
+      var isEnd = y === YEAR_START || y === YEAR_END;
+      var cls = isEnd ? ' is-end' : (y % 5 === 0 ? ' is-major' : '');
+      out += '<i' + (cls ? ' class="' + cls.trim() + '"' : '') + ' style="left:' + p.toFixed(3) + '%"></i>';
+    }
+    return out;
+  }
+
+  function hudCard(mod, delay, label, id, unit, note) {
+    return '<aside class="hud-card hud-card--' + mod + ' reveal" style="--d:' + delay + 'ms">'
+      + '<span class="hud-card-k">' + label + '</span>'
+      + '<span class="hud-card-v"><b id="' + id + '">—</b><em>' + unit + '</em></span>'
+      + (note ? '<span class="hud-card-note">' + note + '</span>' : '')
+      + '</aside>';
+  }
+
   function legendHTML(ind) {
     var stops = U.rampStops(ind.thresholds);
     var grad = stops.map(function (s) {
@@ -75,30 +95,38 @@
 
     mount.innerHTML = ''
       + '<section class="view view-map">'
-      + '  <header class="hero">'
-      + '    <p class="eyebrow reveal" style="--d:0ms">1990 → 2024 · 逐年回放</p>'
+      + '  <header class="hero hero--center">'
+      + '    <p class="eyebrow reveal" style="--d:0ms">1990 — 2024 · 逐年回放</p>'
       + '    <h1 class="reveal" style="--d:60ms">全球进步地图</h1>'
-      + '    <p class="lede reveal" style="--d:120ms">颜色代表各国 5 岁以下儿童死亡率，颜色越深，孩子越危险。'
-      + '      地球会自己转动，<strong>时间往回放，你能看到整颗星球一点点变浅</strong>——点一个国家，看它走了多远。</p>'
-      + '    <div class="kpis reveal" style="--d:180ms">'
-      + '      <div class="kpi"><span class="kpi-label">各国中位数</span><b id="kMed">—</b><span class="kpi-unit">‰</span></div>'
-      + '      <div class="kpi"><span class="kpi-label">高于 50‰ 的国家</span><b id="kHigh">—</b><span class="kpi-unit">个</span></div>'
-      + '      <div class="kpi"><span class="kpi-label">低于 10‰ 的国家</span><b id="kLow">—</b><span class="kpi-unit">个</span></div>'
-      + '    </div>'
+      + '    <p class="lede reveal" style="--d:120ms">颜色代表各国 5 岁以下儿童死亡率，<strong>越烫越危险</strong>。'
+      + '      地球会自己转动，时间往回放，你能看到整颗星球一点点烧红；往前走，红色一点点褪去——点一个国家，看它走了多远。</p>'
       + '  </header>'
       + '  <section class="globe-block">'
-      + '    <div class="globe-stage" id="globeStage">'
-      + '      <canvas id="globeCanvas" class="globe-canvas reveal" style="--d:280ms" aria-label="可旋转的世界地图，颜色表示各国 5 岁以下儿童死亡率"></canvas>'
-      + '      <div class="globe-year" id="globeYear"><b>1990</b><em>年</em></div>'
-      + '      <div class="globe-tip" id="globeTip" hidden></div>'
-      + '      <p class="globe-hint" id="globeHint">拖动旋转 · 点击国家看详情</p>'
+      + '    <div class="globe-zone" id="globeZone">'
+      + hudCard('a', 180, '各国中位数', 'kMed', '‰', '1990 → 2024')
+      + hudCard('b', 260, '高于 50‰ 的国家', 'kHigh', '个', '')
+      + hudCard('c', 220, '低于 10‰ 的国家', 'kLow', '个', '')
+      + '      <div class="globe-stage" id="globeStage">'
+      + '        <canvas id="globeCanvas" class="globe-canvas reveal" style="--d:200ms" aria-label="可旋转的世界地图，颜色表示各国 5 岁以下儿童死亡率"></canvas>'
+      + '        <div class="globe-year" id="globeYear"><b>1990</b><em>年</em></div>'
+      + '        <div class="globe-tip" id="globeTip" hidden></div>'
+      + '      </div>'
+      + '      <p class="zone-hint" id="globeHint">拖动旋转<br>点击国家看详情</p>'
       + '    </div>'
-      + '    <div class="timebar reveal" style="--d:340ms">'
-      + '      <button class="play-btn" id="playBtn" type="button" aria-label="播放或暂停时间轴">'
-      + '        <span class="play-icon"></span>'
+      + '    <div class="timebar reveal" style="--d:300ms">'
+      + '      <button class="play-btn" id="playBtn" type="button" aria-label="播放或暂停时间轴" aria-pressed="false">'
+      + '        <svg class="pb-icon pb-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '          <path d="M9 5.5 18 12 9 18.5Z"/>'
+      + '        </svg>'
+      + '        <svg class="pb-icon pb-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">'
+      + '          <path d="M9.5 5.5v13M14.5 5.5v13"/>'
+      + '        </svg>'
       + '      </button>'
       + '      <div class="timebar-main">'
-      + '        <input id="yearRange" class="year-range" type="range" min="' + YEAR_START + '" max="' + YEAR_END + '" step="0.1" value="' + YEAR_END + '" aria-label="年份">'
+      + '        <div class="year-track">'
+      + '          <div class="year-ruler" aria-hidden="true">' + rulerHTML() + '</div>'
+      + '          <input id="yearRange" class="year-range" type="range" min="' + YEAR_START + '" max="' + YEAR_END + '" step="0.1" value="' + YEAR_END + '" aria-label="年份">'
+      + '        </div>'
       + '        <div class="year-ticks"><span style="left:0.0%">1990</span><span style="left:29.41%">2000</span><span style="left:58.82%">2010</span><span style="left:100.0%">2024</span></div>'
       + '      </div>'
       + '    </div>'
@@ -239,6 +267,9 @@
     function renderTime(y) {
       year = y;
       range.value = String(y);
+      // 滑块左侧轨道亮起（::-webkit-slider-runnable-track 用 var(--fill) 取色）
+      range.style.setProperty('--fill',
+        (((y - YEAR_START) / (YEAR_END - YEAR_START)) * 100).toFixed(2) + '%');
       var shown = Math.round(y);
       if (shown !== lastShownYear) {
         lastShownYear = shown;
