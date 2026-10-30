@@ -723,6 +723,7 @@ body[data-view="country"] .hud-rail { display: none; }
 /* 终点：年份随数字一起跳，落定后亮起“今天” */
 .st-to { display: flex; flex-direction: column; align-items: center; }
 .st-tick {
+  position: relative;
   margin: 0 0 6px; display: flex; align-items: baseline; gap: 4px;
   font-family: var(--mono); font-size: 13px; letter-spacing: 0.14em;
   color: rgba(34, 211, 238, 0.65);
@@ -738,15 +739,17 @@ body[data-view="country"] .hud-rail { display: none; }
 }
 .st-tick em { font-style: normal; letter-spacing: 0.12em; }
 .st-tick-now {
-  margin-left: 9px; padding: 3px 10px 2px;
+  /* 绝对定位：不占位，年份在跳动过程中就不会被这个后出现的标签推来推去 */
+  position: absolute; left: 100%; top: 50%; margin-left: 9px;
+  padding: 3px 10px 2px;
   font-family: var(--font); font-size: 12.5px; font-weight: 600;
   letter-spacing: 0.12em; white-space: nowrap;
   color: var(--end); background: var(--end-soft);
   border: 1px solid var(--end-line); border-radius: 999px;
-  opacity: 0; transform: translateY(6px);
+  opacity: 0; transform: translateY(-50%) translateX(-6px);
   transition: opacity 520ms ease-out 140ms, transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 140ms;
 }
-.is-settled .st-tick-now { opacity: 1; transform: none; }
+.is-settled .st-tick-now { opacity: 1; transform: translateY(-50%); }
 
 .st-big { display: flex; align-items: baseline; justify-content: center; gap: 11px; line-height: 0.84; }
 .st-big b {
