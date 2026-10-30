@@ -443,3 +443,368 @@ body[data-view="country"] .site-foot { display: none; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* =========================================================
+   开场直觉测试 · 极简 HUD 覆盖层
+   深空底 + 青色发光细边 + 取景框折角；只在覆盖层内部生效
+   ========================================================= */
+.calib {
+  --hud-ink: #E5F2FF;
+  --hud-ink-2: #94A3B8;
+  --hud-ink-3: #64748B;
+  --hud-cyan: #06B6D4;
+  --hud-neon: #22D3EE;
+  --hud-label: #0891B2;
+  --hud-ok: #22C55E;
+  --hud-no: #EF4444;
+  --hud-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(2, 6, 23, 0.80);
+  -webkit-backdrop-filter: blur(7px) saturate(130%);
+  backdrop-filter: blur(7px) saturate(130%);
+  overflow-y: auto;
+  opacity: 0;
+  transition: opacity 420ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.calib.is-in { opacity: 1; }
+.calib.is-closing { opacity: 0; pointer-events: none; }
+
+/* 极低对比静电扫描线：只做质感，不抢内容 */
+.calib::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg,
+    rgba(148, 163, 184, 0.055) 0 1px, transparent 1px 4px);
+}
+
+body.calib-open { overflow: hidden; }
+
+/* ---------- 玻璃卡片 ---------- */
+.calib-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 566px;
+  margin: auto;
+  padding: 30px 32px 32px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(6, 182, 212, 0.30);
+  border-radius: 10px;
+  color: var(--hud-ink);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 0 20px rgba(6, 182, 212, 0.35),
+    0 28px 64px rgba(2, 6, 23, 0.55),
+    inset 0 0 70px rgba(6, 182, 212, 0.05);
+  transition: box-shadow 260ms ease, border-color 260ms ease;
+}
+.calib-card:hover {
+  border-color: rgba(6, 182, 212, 0.45);
+  box-shadow:
+    0 0 26px rgba(6, 182, 212, 0.45),
+    0 28px 64px rgba(2, 6, 23, 0.55),
+    inset 0 0 70px rgba(6, 182, 212, 0.07);
+}
+
+/* 取景框折角：hover 时外扩，做 Tactical Lock */
+.calib-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 0 solid var(--hud-neon);
+  opacity: 0.55;
+  pointer-events: none;
+  transition: width 150ms ease, height 150ms ease, opacity 150ms ease;
+}
+.calib-corner.tl { top: -1px; left: -1px; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: 3px; }
+.calib-corner.tr { top: -1px; right: -1px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 3px; }
+.calib-corner.bl { bottom: -1px; left: -1px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 3px; }
+.calib-corner.br { bottom: -1px; right: -1px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 3px; }
+.calib-card:hover .calib-corner { width: 23px; height: 23px; opacity: 0.92; }
+
+/* ---------- 顶部装饰行 ---------- */
+.calib-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 22px;
+  font-family: var(--hud-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  line-height: 1.4;
+  color: var(--hud-label);
+  text-transform: uppercase;
+}
+.calib-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--hud-neon);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.9);
+  animation: calib-pulse 2s ease-in-out infinite;
+}
+@keyframes calib-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.32; transform: scale(0.78); }
+}
+
+/* ---------- Skip：极小、不起眼 ---------- */
+.calib-skip {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  padding: 4px 6px;
+  background: none;
+  border: 0;
+  font-family: var(--hud-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: #475569;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+.calib-skip:hover { color: var(--hud-ink-2); }
+.calib-skip:focus-visible { outline: 1px solid var(--hud-neon); outline-offset: 2px; }
+
+/* ---------- 题面 ---------- */
+.calib-step {
+  margin: 0 0 12px;
+  font-family: var(--hud-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--hud-label);
+}
+.calib-stem {
+  margin: 0 0 10px;
+  font-family: var(--font);
+  font-size: clamp(20px, 4.4vw, 25px);
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--hud-ink);
+  max-width: 30ch;
+}
+.calib-hint {
+  margin: 0 0 22px;
+  max-width: 46ch;
+  font-family: var(--hud-mono);
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--hud-ink-2);
+}
+
+/* ---------- 选项 ---------- */
+.calib-opts { display: grid; gap: 10px; }
+.calib-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 15px;
+  text-align: left;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  color: #CBE3F5;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease,
+              box-shadow 160ms ease, transform 160ms ease;
+}
+.calib-opt:hover {
+  border-color: rgba(6, 182, 212, 0.75);
+  background: rgba(6, 182, 212, 0.10);
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.30);
+  transform: translateY(-1px);
+}
+.calib-opt:focus-visible { outline: 1px solid var(--hud-neon); outline-offset: 2px; }
+/* Holographic Pierce：按下用内发光，不做重力下沉 */
+.calib-opt:active {
+  transform: none;
+  box-shadow: inset 0 0 20px rgba(34, 211, 238, 0.28), 0 0 15px rgba(6, 182, 212, 0.25);
+}
+.calib-opts.is-locked .calib-opt { pointer-events: none; }
+.calib-opts.is-locked .calib-opt:not(.is-right):not(.is-wrong) { opacity: 0.5; }
+
+.calib-key {
+  flex: none;
+  min-width: 12px;
+  font-family: var(--hud-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--hud-label);
+}
+.calib-opt.is-right .calib-key { color: var(--hud-ok); }
+.calib-opt.is-wrong .calib-key { color: var(--hud-no); }
+.calib-text { flex: 1; }
+.calib-mark { flex: none; font-family: var(--hud-mono); font-size: 13px; }
+
+.calib-opt.is-right {
+  border-color: rgba(34, 197, 94, 0.85);
+  background: rgba(34, 197, 94, 0.14);
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.35), inset 0 0 22px rgba(34, 197, 94, 0.12);
+  color: #DCFCE7;
+  animation: calib-flash-ok 260ms ease 2;
+}
+.calib-opt.is-right .calib-mark { color: var(--hud-ok); }
+.calib-opt.is-wrong {
+  border-color: rgba(239, 68, 68, 0.85);
+  background: rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.32), inset 0 0 22px rgba(239, 68, 68, 0.10);
+  color: #FEE2E2;
+  animation: calib-flash-no 260ms ease 2;
+}
+.calib-opt.is-wrong .calib-mark { color: var(--hud-no); }
+
+@keyframes calib-flash-ok {
+  0%, 100% { box-shadow: 0 0 18px rgba(34, 197, 94, 0.35), inset 0 0 22px rgba(34, 197, 94, 0.12); }
+  50% { box-shadow: 0 0 30px rgba(34, 197, 94, 0.75), inset 0 0 30px rgba(34, 197, 94, 0.26); }
+}
+@keyframes calib-flash-no {
+  0%, 100% { box-shadow: 0 0 18px rgba(239, 68, 68, 0.32), inset 0 0 22px rgba(239, 68, 68, 0.10); }
+  50% { box-shadow: 0 0 28px rgba(239, 68, 68, 0.62), inset 0 0 28px rgba(239, 68, 68, 0.22); }
+}
+
+/* ---------- 判题反馈 ---------- */
+.calib-feedback {
+  min-height: 36px;
+  margin: 14px 0 0;
+  font-family: var(--hud-mono);
+  font-size: 11px;
+  line-height: 1.7;
+  color: #7DD3FC;
+}
+.calib-feedback.is-ok { color: #86EFAC; }
+.calib-feedback.is-no { color: #FCA5A5; }
+
+/* ---------- 进度条：渐变 + 发光扫描 ---------- */
+.calib-progress {
+  position: relative;
+  height: 2px;
+  margin-top: 18px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+.calib-progress i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.4), var(--hud-neon));
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+  transition: width 420ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+.calib-progress i::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: calib-shine 2.6s linear infinite;
+}
+@keyframes calib-shine {
+  0% { transform: translateX(-130%); }
+  100% { transform: translateX(330%); }
+}
+
+/* ---------- 结算页 ---------- */
+.calib-score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--hud-mono);
+}
+.calib-score b {
+  font-size: clamp(46px, 12vw, 62px);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--hud-neon);
+  text-shadow: 0 0 26px rgba(34, 211, 238, 0.45);
+}
+.calib-score span { font-size: 15px; color: var(--hud-ink-3); }
+
+.calib-verdict {
+  margin: 16px 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--hud-ink);
+}
+.calib-line {
+  margin: 0 0 20px;
+  max-width: 42ch;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #B6C4D4;
+}
+
+.calib-recap {
+  list-style: none;
+  display: grid;
+  gap: 7px;
+  margin: 0 0 22px;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  font-family: var(--hud-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--hud-ink-2);
+}
+.calib-recap-row { display: flex; align-items: baseline; gap: 9px; }
+.calib-recap-idx { color: var(--hud-ink-3); }
+.calib-recap-mark { font-size: 11px; }
+.calib-recap-mark.yes { color: var(--hud-ok); }
+.calib-recap-mark.no { color: var(--hud-no); }
+.calib-recap-body { flex: 1; }
+
+.calib-cta {
+  width: 100%;
+  padding: 15px 18px;
+  background: var(--hud-neon);
+  color: #020617;
+  border: 1px solid var(--hud-neon);
+  border-radius: 6px;
+  font-family: var(--hud-mono);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  box-shadow: 0 0 25px rgba(34, 211, 238, 0.5);
+  transition: background 160ms ease, box-shadow 160ms ease;
+}
+.calib-cta:hover {
+  background: #67E8F9;
+  border-color: #67E8F9;
+  box-shadow: 0 0 34px rgba(34, 211, 238, 0.72);
+}
+.calib-cta:active {
+  background: #22D3EE;
+  box-shadow: inset 0 0 24px rgba(2, 6, 23, 0.28), 0 0 25px rgba(34, 211, 238, 0.5);
+}
+.calib-cta:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(165, 243, 252, 0.45), 0 0 34px rgba(34, 211, 238, 0.72);
+}
+
+@media (max-width: 560px) {
+  .calib { padding: 14px 12px; align-items: flex-start; }
+  .calib-card { padding: 22px 18px 24px; margin-top: 5vh; }
+  .calib-top { font-size: 8.5px; letter-spacing: 0.08em; margin-bottom: 18px; padding-right: 50px; }
+  .calib-opt { padding: 12px 13px; font-size: 14.5px; }
+  .calib-feedback { min-height: 46px; font-size: 10.5px; }
+  .calib-cta { padding: 14px 16px; font-size: 12.5px; }
+}

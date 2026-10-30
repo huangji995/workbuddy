@@ -21,6 +21,11 @@
     // 必须在 cleanup 之前记录：清空地图会让页面变矮，浏览器会把 scrollY 归零
     if (lastWasMap && r.view === 'country') mapScrollY = window.scrollY || 0;
 
+    // 离开首页时收起开场测试层，避免它悬在详情页上
+    if (r.view !== 'map' && GPM.calibration && GPM.calibration.isOpen()) {
+      GPM.calibration.close(true);
+    }
+
     if (typeof cleanup === 'function') cleanup();
     cleanup = null;
 
@@ -32,6 +37,7 @@
       cleanup = GPM.renderMapView(mount);
       requestAnimationFrame(function () { window.scrollTo(0, mapScrollY); });
       lastWasMap = true;
+      if (GPM.calibration) GPM.calibration.maybeOpen();
     }
     document.title = r.view === 'country'
       ? (countryName(r.iso2) + ' · 全球进步地图')

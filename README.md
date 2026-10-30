@@ -22,6 +22,12 @@ npx serve .        # 或 python -m http.server 8080
 - **点击**国家：进入该国详情页（1990 vs 现在对比卡 + 两条趋势线）
 - **时间轴**：播放/暂停（空格键也行），或直接拖到任意年份；播完停在 2024，稍候自动淡出重播
 - 顶部三个指标（各国中位数 / 高于 50‰ 的国家数 / 低于 10‰ 的国家数）随年份实时重算
+- **开场直觉测试**：首次打开先做 3 道单选题，题目数值由数据实时计算；右上角 `[ Skip >> ]` 或 Esc 可跳过
+
+### 开场测试怎么重看
+
+- 每个浏览器会话只弹一次（`sessionStorage`）；新开标签页会再弹
+- 想强制重看：地址后加 `?test=1`，或在控制台执行 `GPM.calibration.open()`
 
 ## 目录
 
@@ -31,6 +37,7 @@ assets/css/style.css          样式（含响应式与入场动效）
 assets/js/app.js              hash 路由（#/ 与 #/c/XX）
 assets/js/globe.js            3D 地球渲染器（d3.geoOrthographic + Canvas 2D）
 assets/js/map-view.js         首页：时间轴状态机、KPI、图例、搜索、榜单
+assets/js/calibration.js      开场直觉测试层（3 题 + 结算，独立于地球渲染）
 assets/js/country-view.js     详情页：对比卡 + 两张小多图
 assets/js/chart.js            手写 SVG 折线图（缺失年份断线）
 assets/js/util.js             连续色阶、按年取值、格式化
