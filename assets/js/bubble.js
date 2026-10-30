@@ -91,10 +91,37 @@
       });
     });
 
-    /* ---------- 尺寸：先建画框再量，legend / 控件占掉的高度要扣掉 ---------- */
+    /* 图例 */
+    var legend = document.createElement('div');
+    legend.className = 'bub-legend';
+    legend.innerHTML = REGION_ORDER.map(function (name) {
+      return '<span><i style="background:' + REGION_COLOR[name] + '"></i>' + name + '</span>';
+    }).join('') + '<span class="bub-legend-size">气泡面积 = 人口</span>';
+    root.appendChild(legend);
+
+    /* 控制条 */
+    var hud = document.createElement('div');
+    hud.className = 'bub-hud';
+    hud.innerHTML = '<div class="bub-year"><b>1990</b><em>年</em></div>'
+      + '<button class="bub-play" type="button" aria-label="播放 1990 到 2024 年的变化">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
+      + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5 18 12 9 18.5Z"/></svg>'
+      + '</button>'
+      + '<div class="bub-track">'
+      + '<input class="bub-range" type="range" min="0" max="' + (N - 1) + '" step="0.02" value="0" aria-label="气泡图年份">'
+      + '<div class="bub-ends"><span>' + Y0 + '</span><span>' + Y1 + '</span></div>'
+      + '</div>';
+    root.appendChild(hud);
+
+    var yearEl = hud.querySelector('.bub-year b');
+    var playBtn = hud.querySelector('.bub-play');
+    var range = hud.querySelector('.bub-range');
+
+    /* ---------- 尺寸 ----------
+       图例与控制条先落地，画框才量得到「扣掉它们之后」的真实高度 */
     var plotEl = document.createElement('div');
     plotEl.className = 'bub-plot';
-    root.appendChild(plotEl);
+    root.insertBefore(plotEl, root.firstChild);
 
     var W = Math.max(320, Math.round(plotEl.clientWidth || root.clientWidth));
     var H = Math.max(220, Math.round(plotEl.clientHeight || root.clientHeight - 90));
@@ -181,32 +208,6 @@
     }
 
     plotEl.appendChild(svg);
-
-    /* 图例 */
-    var legend = document.createElement('div');
-    legend.className = 'bub-legend';
-    legend.innerHTML = REGION_ORDER.map(function (name) {
-      return '<span><i style="background:' + REGION_COLOR[name] + '"></i>' + name + '</span>';
-    }).join('') + '<span class="bub-legend-size">气泡面积 = 人口</span>';
-    root.appendChild(legend);
-
-    /* 控制条 */
-    var hud = document.createElement('div');
-    hud.className = 'bub-hud';
-    hud.innerHTML = '<div class="bub-year"><b>1990</b><em>年</em></div>'
-      + '<button class="bub-play" type="button" aria-label="播放 1990 到 2024 年的变化">'
-      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
-      + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5.5 18 12 9 18.5Z"/></svg>'
-      + '</button>'
-      + '<div class="bub-track">'
-      + '<input class="bub-range" type="range" min="0" max="' + (N - 1) + '" step="0.02" value="0" aria-label="气泡图年份">'
-      + '<div class="bub-ends"><span>' + Y0 + '</span><span>' + Y1 + '</span></div>'
-      + '</div>';
-    root.appendChild(hud);
-
-    var yearEl = hud.querySelector('.bub-year b');
-    var playBtn = hud.querySelector('.bub-play');
-    var range = hud.querySelector('.bub-range');
 
     /* ---------- 渲染 ---------- */
     var cur = 0;          // 当前（浮点）年份下标
