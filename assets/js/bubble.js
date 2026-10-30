@@ -125,7 +125,7 @@
 
     var W = Math.max(320, Math.round(plotEl.clientWidth || root.clientWidth));
     var H = Math.max(220, Math.round(plotEl.clientHeight || root.clientHeight - 90));
-    var m = { l: 46, r: 20, t: 26, b: 42 };
+    var m = { l: 58, r: 22, t: 34, b: 54 };
     var iw = W - m.l - m.r;
     var ih = H - m.t - m.b;
 
@@ -153,7 +153,7 @@
       }));
       var label = v >= 1000 ? (v / 1000) + 'k' : String(v);
       plot.appendChild(node('text', {
-        x: x(v), y: ih + 16, 'text-anchor': 'middle', 'font-size': 10, fill: '#5A6B80'
+        x: x(v), y: ih + 22, 'text-anchor': 'middle', 'font-size': 13, fill: '#94A3B8'
       }, label));
     });
 
@@ -164,17 +164,17 @@
         stroke: 'rgba(148,197,214,0.09)', 'stroke-width': 1
       }));
       plot.appendChild(node('text', {
-        x: -10, y: y(v) + 3.5, 'text-anchor': 'end', 'font-size': 10, fill: '#5A6B80'
+        x: -12, y: y(v) + 4, 'text-anchor': 'end', 'font-size': 13, fill: '#94A3B8'
       }, String(v)));
     });
 
     /* 轴标题 */
     plot.appendChild(node('text', {
-      x: iw, y: ih + 34, 'text-anchor': 'end', 'font-size': 10, fill: '#64748B',
+      x: iw, y: ih + 44, 'text-anchor': 'end', 'font-size': 13, fill: '#94A3B8',
       'letter-spacing': '0.08em'
     }, '人均 GDP（PPP，国际元 · 对数刻度）→'));
     plot.appendChild(node('text', {
-      x: 0, y: -8, 'font-size': 10, fill: '#64748B', 'letter-spacing': '0.08em'
+      x: 0, y: -13, 'font-size': 13, fill: '#94A3B8', 'letter-spacing': '0.06em'
     }, '↑ 出生时预期寿命（岁）'));
 
     var gBub = node('g', {});
@@ -198,7 +198,7 @@
       r: 0, fill: 'none', stroke: '#22D3EE', 'stroke-width': 1.6, opacity: 0
     });
     var label = node('text', {
-      'font-size': 12, 'font-weight': 600, fill: '#F7F5F0', 'text-anchor': 'middle',
+      'font-size': 14, 'font-weight': 600, fill: '#FFFFFF', 'text-anchor': 'middle',
       'paint-order': 'stroke', stroke: '#020617', 'stroke-width': 3.5, 'stroke-linejoin': 'round',
       opacity: 0
     }, opt.nameZh || '');

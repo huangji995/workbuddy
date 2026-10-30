@@ -62,7 +62,7 @@
   function chartBlock(key, ind, m, suffix) {
     return '<div class="st-chart">'
       + '<div class="st-chart-head">'
-      + '  <span class="st-chart-name">' + ind.label + ' · ' + ind.unit + '</span>'
+      + '  <span class="st-chart-name">' + ind.label + '<em>' + ind.unit + '</em></span>'
       + '  <span class="st-chart-delta">' + deltaText(key, m) + '</span>'
       + '</div>'
       + '<div class="chart" id="chart-' + suffix + '-' + key + '"></div>'
@@ -260,7 +260,9 @@
       var gap = cs ? (parseFloat(cs.rowGap) || 16) : 16;
       var avail = (innerEl ? innerEl.clientHeight || h : h) - padT - padB;
       var per = (avail - gap * (nCharts - 1)) / nCharts;
-      var plotH = Math.round(Math.max(64, Math.min(200, per - 52)));
+      // 只有一条线时把这一栏用满，别让单张图缩成一条细带
+      var cap = nCharts === 1 ? 330 : 210;
+      var plotH = Math.round(Math.max(70, Math.min(cap, per - 82)));
 
       var blocks = [
         { key: 'u5mr', color: '#22D3EE', ind: indU, series: su },

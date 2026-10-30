@@ -81,7 +81,7 @@ async function main() {
     await send('Page.enable');
   }
   await send('Emulation.setDeviceMetricsOverride', {
-    width, height, deviceScaleFactor: 1, mobile: width < 700,
+    width, height, deviceScaleFactor: Number(process.env.DSF || 1), mobile: width < 700,
   });
   await sleep(1800);
   const out = await send('Runtime.evaluate', {
@@ -97,10 +97,15 @@ async function main() {
     if (process.argv[7] === 'full') {
       const m = await send('Page.getLayoutMetrics');
       const h = Math.min(4000, Math.ceil(m.result.cssContentSize.height));
-      await send('Emulation.setDeviceMetricsOverride', { width, height: h, deviceScaleFactor: 1, mobile: width < 700 });
+      await send('Emulation.setDeviceMetricsOverride', { width, height: h, deviceScaleFactor: Number(process.env.DSF || 1), mobile: width < 700 });
       await sleep(700);
     }
-    const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    let params = { format: 'png', captureBeyondViewport: false };
+    if (process.env.CLIP) {
+      const [x, y, w, hh] = process.env.CLIP.split(',').map(Number);
+      params.clip = { x, y, width: w, height: hh, scale: Number(process.env.CLIP_SCALE || 3) };
+    }
+    const shot = await send('Page.captureScreenshot', params);
     fs.writeFileSync(outPng, Buffer.from(shot.result.data, 'base64'));
     console.log('shot ->', outPng);
   }

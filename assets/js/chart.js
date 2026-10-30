@@ -54,7 +54,7 @@
 
     var W = Math.max(260, Math.round(container.clientWidth || 620));
     var showX = cfg.showXAxis !== false;
-    var m = { l: 46, r: 20, t: 14, b: showX ? 26 : 8 };
+    var m = { l: 58, r: 22, t: 18, b: showX ? 36 : 12 };
     // 绘图区高度固定：上下两张小多图才能沿时间轴严格对齐
     var ih = cfg.plotHeight || 160;
     var H = m.t + ih + m.b;
@@ -82,8 +82,8 @@
       var y = sy(v);
       svg.appendChild(node('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y, stroke: 'rgba(148,197,214,0.10)', 'stroke-width': 1 }));
       svg.appendChild(node('text', {
-        x: m.l - 8, y: y + 3.5, 'text-anchor': 'end',
-        'font-size': 10, fill: '#64748B', 'font-variant-numeric': 'tabular-nums'
+        x: m.l - 10, y: y + 4, 'text-anchor': 'end',
+        'font-size': 13, fill: '#94A3B8', 'font-variant-numeric': 'tabular-nums'
       }, cfg.yFormat ? cfg.yFormat(v) : String(v)));
     });
 
@@ -108,7 +108,7 @@
       var start = Math.ceil(yr0 / step) * step;
       for (var yv = start; yv <= yr1; yv += step) {
         svg.appendChild(node('text', {
-          x: sx(yv), y: m.t + ih + 19, 'text-anchor': 'middle', 'font-size': 10, fill: '#64748B'
+          x: sx(yv), y: m.t + ih + 23, 'text-anchor': 'middle', 'font-size': 13, fill: '#94A3B8'
         }, String(yv)));
       }
     }
@@ -142,9 +142,9 @@
     var anchor = tailX > m.l + iw - 44 ? 'end' : 'start';
     svg.appendChild(node('text', {
       x: tailX + (anchor === 'end' ? -8 : 8),
-      y: sy(last[1]) - 10,
+      y: sy(last[1]) - 12,
       'text-anchor': anchor,
-      'font-size': 12,
+      'font-size': 14,
       'font-weight': 500,
       fill: cfg.color,
       'font-variant-numeric': 'tabular-nums'
