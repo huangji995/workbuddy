@@ -8,9 +8,9 @@
 
   var DECOR = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* 动画节奏：先停 0.5 秒让人看清起点，再用 3 秒落到最新一年 */
+  /* 动画节奏：先停 0.5 秒让人看清起点，再用 2.5 秒落到最新一年 */
   var PAUSE = 500;
-  var DUR = 3000;
+  var DUR = 2500;
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
