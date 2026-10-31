@@ -29,14 +29,15 @@
     return out;
   }
 
-  /** 缺 1 年以上就断开，不做插值 */
-  function splitSegments(series) {
+  /** 缺 maxGap 年以上就断开，不做插值（教育年限这类 5 年一档的序列要放宽） */
+  function splitSegments(series, maxGap) {
     var segs = [];
     var cur = null;
     var prev = null;
+    var gap = maxGap || 1;
     for (var i = 0; i < series.length; i++) {
       var p = series[i];
-      if (prev !== null && p[0] - prev > 1) cur = null;
+      if (prev !== null && p[0] - prev > gap) cur = null;
       if (!cur) {
         cur = [];
         segs.push(cur);
@@ -80,10 +81,10 @@
     // 水平网格 + y 轴刻度
     tickValues(y0, y1, 4).forEach(function (v) {
       var y = sy(v);
-      svg.appendChild(node('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y, stroke: 'rgba(148,197,214,0.10)', 'stroke-width': 1 }));
+      svg.appendChild(node('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y, stroke: 'rgba(148,197,214,0.14)', 'stroke-width': 1 }));
       svg.appendChild(node('text', {
         x: m.l - 10, y: y + 4, 'text-anchor': 'end',
-        'font-size': 13, fill: '#94A3B8', 'font-variant-numeric': 'tabular-nums'
+        'font-size': 13.5, fill: '#B6C6D8', 'font-variant-numeric': 'tabular-nums'
       }, cfg.yFormat ? cfg.yFormat(v) : String(v)));
     });
 
@@ -98,7 +99,7 @@
     // x 轴：轴线两张图都画（便于上下对齐），年份标签只给最下面那张
     svg.appendChild(node('line', {
       x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih,
-      stroke: showX ? 'rgba(148,197,214,0.24)' : 'rgba(148,197,214,0.10)', 'stroke-width': 1
+      stroke: showX ? 'rgba(148,197,214,0.34)' : 'rgba(148,197,214,0.14)', 'stroke-width': 1
     }));
     if (showX) {
       var step = spanX > 40 ? 10 : spanX > 14 ? 5 : 2;
@@ -108,14 +109,14 @@
       var start = Math.ceil(yr0 / step) * step;
       for (var yv = start; yv <= yr1; yv += step) {
         svg.appendChild(node('text', {
-          x: sx(yv), y: m.t + ih + 23, 'text-anchor': 'middle', 'font-size': 13, fill: '#94A3B8'
+          x: sx(yv), y: m.t + ih + 23, 'text-anchor': 'middle', 'font-size': 13.5, fill: '#B6C6D8'
         }, String(yv)));
       }
     }
 
     // 折线（按缺口分段）：先铺一层半透明粗线做辉光，再画主线
     // 两组 path 走同一套 dasharray，动画时前进量完全一致，不会错位
-    var segs = splitSegments(series);
+    var segs = splitSegments(series, cfg.maxGap);
     var segNodes = segs.map(function (seg) {
       var d = '';
       seg.forEach(function (p, i) {
@@ -181,6 +182,7 @@
     });
     svg.appendChild(hit);
 
+    var nearTol = Math.max(1, Math.round((cfg.maxGap || 1) / 2));
     function nearest(year) {
       var best = null;
       var bestD = Infinity;
@@ -188,7 +190,7 @@
         var d = Math.abs(series[i][0] - year);
         if (d < bestD) { bestD = d; best = series[i]; }
       }
-      return bestD <= 1 ? best : null;
+      return bestD <= nearTol ? best : null;
     }
 
     container.appendChild(svg);

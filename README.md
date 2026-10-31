@@ -53,16 +53,18 @@ assets/js/app.js              hash 路由（#/ 与 #/c/XX）
 assets/js/globe.js            3D 地球渲染器（d3.geoOrthographic + Canvas 2D）
 assets/js/map-view.js         首页：时间轴状态机、KPI、图例、搜索、榜单
 assets/js/calibration.js      开场直觉测试层（3 题 + 结算，独立于地球渲染）
-assets/js/country-view.js     详情页：滚动叙事（sticky 画布 + IntersectionObserver 状态机）
+assets/js/country-view.js     详情页：指标胶囊栏、数字+折线区块、气泡图区块
 assets/js/bubble.js          Gapminder 气泡图（对数横轴、气泡面积=人口、逐年回放）
-assets/js/chart.js            手写 SVG 折线图（缺失年份断线）
+assets/js/chart.js            手写 SVG 折线图（缺失年份断线、逐点绘制）
 assets/js/util.js             连续色阶、按年取值、格式化
 assets/vendor/d3.min.js       d3 v7（仅用到 d3-geo 一族，MIT）
 data/data.js                  数据快照（挂 window.__GPM_DATA__）
 data/bubble.js                人均 GDP（PPP）与总人口快照（挂 window.__GPM_BUBBLE__，1990—2024）
+data/indicators.js            疫苗率 / 电力 / 儿童人口 / 女性教育快照（挂 window.__GPM_IND__）
 data/geo.js                   国界 GeoJSON（挂 window.__GPM_GEO__，Natural Earth 110m）
 scripts/build-data.mjs        WDI 数据重建（开发期一次性运行，需要网络）
 scripts/build-bubble.mjs      气泡图数据重建：NY.GDP.PCAP.PP.CD + SP.POP.TOTL
+scripts/build-indicators.mjs  详情页补充指标重建：SH.IMM.IDPT / EG.ELC.ACCS.ZS / SP.POP.0014.TO.ZS / BAR.SCHL.15UP.FE
 scripts/build-geo.mjs         国界重建：world-atlas TopoJSON → GeoJSON → data/geo.js
 scripts/countries-110m.json   构建素材：world-atlas@2
 scripts/iso-codes.json        构建素材：ISO numeric → alpha2 映射
@@ -76,7 +78,8 @@ scripts/fetch-remote.mjs      命令行被墙时用浏览器抓取远程文本�
 - 指标：**World Bank WDI** `SH.DYN.MORT`（5 岁以下儿童死亡率，每 1000 活产儿）、`SP.DYN.LE00.IN`（出生时预期寿命，岁）；气泡图另用 `NY.GDP.PCAP.PP.CD`（人均 GDP，PPP 国际元）与 `SP.POP.TOTL`（总人口）。
 - 国界：**Natural Earth 110m**（经 world-atlas@2），177 个国家多边形，全部能与 WDI 数据对上 ISO2。
 - 覆盖：245 个地图区域，其中 196 个有数据；无数据的国家在地球上是中性灰，悬停显示「暂无数据」，不填任何估算值。
-- 重建：`node scripts/build-data.mjs`、`node scripts/build-bubble.mjs`、`node scripts/build-geo.mjs`（均需网络，只在开发期运行）；页面本身永远不联网。
+- 详情页另有 4 个可按国家拆开的指标（疫苗率、电力可及率、0—14 岁人口占比、女性平均受教育年限），来自同样的 WDI，见 `data/indicators.js`。
+- 重建：`node scripts/build-data.mjs`、`node scripts/build-bubble.mjs`、`node scripts/build-geo.mjs`、`node scripts/build-indicators.mjs`（均需网络，只在开发期运行）；页面本身永远不联网。
 
 ### 为什么数据都是 `.js`
 `file://` 下 `fetch('data.json')` 会被 CORS 拦掉，这是"离线可跑"最常见的翻车点。`.js` 文件把同一份 JSON 字面量挂到 `window` 全局，内容仍可按 JSON 解析。
@@ -101,32 +104,43 @@ scripts/fetch-remote.mjs      命令行被墙时用浏览器抓取远程文本�
 | 气泡图坐标轴写死量程（GDP 250—200000、寿命 25—88） | 量程固定，气泡才会真的"往右上角挪"；量程跟着数据走的话，看起来就是原地抖动 |
 | hash 路由 | `file://` 下 `pushState` 受限，hash 的直链/刷新/后退都安全 |
 
-## 详情页的滚动叙事
+## 详情页：指标切换 + 三段式区块
 
-三屏，总高 **260vh**（`70 + 70 + 120`，原来 5×100vh）。全部由 `IntersectionObserver`（中线触发）驱动，`data-state` 切三种画布状态：
+整页没有任何滚动锁定、没有 scroll-snap、没有撑满视口的 sticky 画布 —— 三块内容都是普通的
+文档流区块，随便上下滚：
 
-| 步 | 画布 | 屏高 |
+| 区块 | 高度 | 内容 |
 |---|---|---|
-| 0 | 「起点 1990 → 今天」的竖向对照：上方小字起点、中间发光坠落线、下方巨大数字 | 70vh |
-| 1 | 数字缩到左侧并一路坠落到今天，年份标签同步跳；右侧两条趋势线淡入，末尾浮出降幅 | 70vh |
-| 2 | Gapminder 气泡图接管：横轴人均 GDP（对数），纵轴预期寿命，面积=人口，颜色=地区；左上角一行 HUD 标题 | 120vh |
+| 顶部固定条 | 约 119px | 返回 + 国家名 + 一排可横向滑动的指标胶囊（sticky） |
+| 1 数字 + 折线 | `min-height: 80vh` | 左：`[ 国家 ]` + 指标名 + 起点 → 连接线 → 巨大终值；右：该指标的折线 |
+| 2 气泡图 | 约一屏 | Gapminder：横轴人均 GDP（对数），纵轴预期寿命，面积=人口，颜色=地区 |
+| 3 尾注 | 自适应 | 指标跨度、WDI 指标号、可展开的数据表 |
 
-叙事页上没有任何解释句：左侧只剩数字与年份，右侧只剩图例、坐标轴与降幅，气泡屏只保留
-`[ 全球各国：收入与寿命的变迁 ]` 这一行标题。没有气泡数据的 42 个国家（古巴、朝鲜等）
-不铺第 3 屏，整页只有 140vh。
+### 指标（6 个，全部按国家拆开）
 
-- 大数字的节奏：先停 0.5 秒（把起点读清楚），再用 3 秒 `easeInOutCubic` 落到今天；年份标签与数字共用同一条进度曲线
-- **左右联动**：折线用 `stroke-dasharray/​dashoffset` 逐点生长，进度直接取数字补间的那条缓动曲线，所以笔尖和数字同起同落；分段按累计长度排队，有断线的国家不会几段同时冒出来。画到 100% 时终点圆点才亮起并浮出尾值
-- 起点与终点之间的坠落线是一条 SVG（竖线 + 箭头同一条渐变），不是「线条 + ↓ 字符」拼的，所以不会断开
-- 落定后数字按方向变色：变好走科技绿 `#34D399`，变差走暗红 `#DC4B4B`（`data-trend`）
-- 坠落途中滑到下一屏不会掐断动画；滚回第一屏才重置（数字和折线一起归零）
-- 屏 1 两栏共用一条水平中心线：`.st-num` 上下 `padding` 对称，数字块自己就落在 50%；「向下滚动」是绝对定位，不参与居中
-- ≤1080 时上下分栏：数字退到顶部（`justify-content: flex-start`），折线从 38vh 接上
-- 叙事页开了 `scroll-snap-type: y proximity`，一次滑动正好停一屏；离开详情页立刻摘掉，不影响首页
-- 数字落定期间，真实终值始终写在 DOM 里（`#stBig`），读屏与搜索都能读到
-- 画布状态只改 `opacity` / `transform` / `font-size`，不碰 `top/width/height`
-- `prefers-reduced-motion` 下过渡压到 1ms、数字直接落定、折线直接画完、气泡图不自动播放
-- 气泡图有自己的时间轴：▶ 播放（约 14 秒跑完 1990—2024）、拖动、键盘左右
+| 指标 | 单位 | WDI | 覆盖 |
+|---|---|---|---|
+| 5岁以下儿童死亡率（默认选中） | ‰ | `SH.DYN.MORT` | 196 国 |
+| 预期寿命 | 岁 | `SP.DYN.LE00.IN` | 196 国 |
+| 一岁儿童疫苗接种率 | % | `SH.IMM.IDPT` | 193 国 |
+| 电力可及率 | % | `EG.ELC.ACCS.ZS` | 214 国 |
+| 0—14 岁人口占比 | % | `SP.POP.0014.TO.ZS` | 215 国 |
+| 女性平均受教育年限 | 年 | `BAR.SCHL.15UP.FE` | 144 国（5 年一档） |
+
+前两个在 `data/data.js`，后四个由 `scripts/build-indicators.mjs` 抓成 `data/indicators.js`
+（一次 `country/all` 请求拿全量，构建期抓取，运行时零请求）。某个国家缺哪项，那颗胶囊就置灰、
+进不去；一个都没有的国家退回纯文字页。
+
+- 点胶囊 → 左侧数字、单位、起点、年份、右侧 Y 轴与数据线一起换；换完如果这块在视口里，动画重播一次
+- **进入播、离开重置**：`IntersectionObserver`（`threshold 0.4`）只看「这块够不够显眼」，
+  滚走就 `reset()`（数字回起点、折线清空），滚回来再播一次；向上滚同样能重播
+- 动画节奏不变：先停 0.5 秒把起点读清楚，再用 3 秒 `easeInOutCubic` 落到最新一年；折线进度直接取数字补间的那个缓动值，笔尖和数字同起同落
+- 连接线的箭头跟着指标方向翻：数值整体在跌就朝下（`scaleY(-1)` 由 `data-dir` 控制）
+- 终值颜色看指标语义：跌了更好（儿童死亡率）走绿，涨了更好走绿，涨跌都不代表好坏（儿童人口占比）走中性青，变差走暗红
+- 气泡图懒创建：第一次进视口才建，之后用自带时间轴（▶ 播放约 14 秒跑完 1990—2024、拖动、键盘左右）
+- `≤900` 上下分栏（1024 仍是左右两栏）；手机端胶囊栏横向滑动、右侧有渐隐提示
+- `prefers-reduced-motion` 下数字直接落定、折线直接画完
+- 数字落定后终值仍写在 DOM 里（`#stBig`），读屏与搜索都能读到
 
 ## 已知限制
 
