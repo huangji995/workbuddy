@@ -175,6 +175,7 @@
       + '<p class="calib-verdict">你的认知准确度：' + state.score + ' / ' + total + '</p>'
       + '<p class="calib-line">大多数人的直觉比随机瞎猜还差，这个世界比你想象的要好。</p>'
       + '<ul class="calib-recap">' + rows + '</ul>'
+      + '<p class="calib-invite">这个世界，比你想象的要好。来看看真实的数据。</p>'
       + '<button class="calib-cta" id="calibCta" type="button">[ 进入真实数据 -&gt; ]</button>';
   }
 
@@ -335,7 +336,7 @@
     setTimeout(done, FADE_MS);
   }
 
-  /** 首页渲染后调用：本次会话没做过就弹出来 */
+  /** 首页渲染后调用：本次会话没做过就弹出来（启动日志还在播就等它播完） */
   function maybeOpen() {
     var forced = /(?:^|[?&])test=1(?:&|$)/.test(location.search);
     if (forced) {
@@ -343,11 +344,16 @@
     } else if (lockedGet()) {
       return;
     }
-    setTimeout(function () {
-      // 用户可能已经滚开或跳去详情页了
-      if (!document.getElementById('globeCanvas') || location.hash.indexOf('#/c/') === 0) return;
-      open();
-    }, OPEN_DELAY);
+    function arm() {
+      setTimeout(function () {
+        // 用户可能已经滚开或跳去详情页了
+        if (!document.getElementById('globeCanvas') || location.hash.indexOf('#/c/') === 0) return;
+        if (document.body.classList.contains('boot-open')) return;
+        open();
+      }, OPEN_DELAY);
+    }
+    if (GPM.boot && GPM.boot.isActive()) GPM.boot.onDone(arm);
+    else arm();
   }
 
   GPM.calibration = {

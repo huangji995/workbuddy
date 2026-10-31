@@ -34,10 +34,12 @@ npx serve .        # 或 python -m http.server 8080
 
 - **拖动**旋转地球（带惯性），松手后缓慢自转
 - **悬停**国家：显示当年数值、较 1990 的变化幅度
-- **点击**国家：进入滚动叙事详情页——大数字倒数 → 两条趋势线 → Gapminder 气泡图
+- **切换指标**：地球上方一排胶囊（儿童死亡率 / 预期寿命 / 疫苗率 / 电力 / 女性教育），地图着色、图例、榜单、列表、三个 KPI 一起换
+- **点击**国家：进入双屏详情页——正中巨大数字 → 滚动后数字缩到左栏、折线滑出 → Gapminder 气泡图。详情页默认继承你在地球上选中的指标
 - **时间轴**：播放/暂停（空格键也行），或直接拖到任意年份；播完停在 2024，稍候自动淡出重播
-- 顶部三个指标（各国中位数 / 高于 50‰ 的国家数 / 低于 10‰ 的国家数）随年份实时重算
-- **开场直觉测试**：首次打开先做 3 道单选题，题目数值由数据实时计算；右上角 `[ Skip >> ]` 或 Esc 可跳过
+- 顶部三张 KPI 卡（中位数 / 高于高位的国家数 / 低于低位的国家数）随年份与指标实时重算
+- **开场启动日志**：深空底上逐行打字（含「灵感与数据来源：汉斯·罗斯林《事实》」），点击或任意按键跳过
+- **开场直觉测试**：启动日志之后弹 3 道单选题，题目数值由数据实时计算；右上角 `[ Skip >> ]` 或 Esc 可跳过
 
 ### 开场测试怎么重看
 
@@ -51,20 +53,22 @@ index.html                    入口
 assets/css/style.css          样式（含响应式与入场动效）
 assets/js/app.js              hash 路由（#/ 与 #/c/XX）
 assets/js/globe.js            3D 地球渲染器（d3.geoOrthographic + Canvas 2D）
-assets/js/map-view.js         首页：时间轴状态机、KPI、图例、搜索、榜单
+assets/js/map-view.js         首页：指标胶囊、时间轴状态机、KPI、图例、搜索、榜单
+assets/js/metrics.js          全局指标表（label/单位/色阶锚点/betterWhen）+ 选中的指标状态
+assets/js/boot.js             开场启动日志（打字机，一次会话一次）
 assets/js/calibration.js      开场直觉测试层（3 题 + 结算，独立于地球渲染）
-assets/js/country-view.js     详情页：指标胶囊栏、数字+折线区块、气泡图区块
+assets/js/country-view.js     详情页：双屏滚动舞台、两套指标控件、数字+折线、气泡图
 assets/js/bubble.js          Gapminder 气泡图（对数横轴、气泡面积=人口、逐年回放）
 assets/js/chart.js            手写 SVG 折线图（缺失年份断线、逐点绘制）
 assets/js/util.js             连续色阶、按年取值、格式化
 assets/vendor/d3.min.js       d3 v7（仅用到 d3-geo 一族，MIT）
 data/data.js                  数据快照（挂 window.__GPM_DATA__）
 data/bubble.js                人均 GDP（PPP）与总人口快照（挂 window.__GPM_BUBBLE__，1990—2024）
-data/indicators.js            疫苗率 / 电力 / 儿童人口 / 女性教育快照（挂 window.__GPM_IND__）
+data/indicators.js            疫苗率 / 电力 / 女性教育快照（挂 window.__GPM_IND__）
 data/geo.js                   国界 GeoJSON（挂 window.__GPM_GEO__，Natural Earth 110m）
 scripts/build-data.mjs        WDI 数据重建（开发期一次性运行，需要网络）
 scripts/build-bubble.mjs      气泡图数据重建：NY.GDP.PCAP.PP.CD + SP.POP.TOTL
-scripts/build-indicators.mjs  详情页补充指标重建：SH.IMM.IDPT / EG.ELC.ACCS.ZS / SP.POP.0014.TO.ZS / BAR.SCHL.15UP.FE
+scripts/build-indicators.mjs  补充指标重建：SH.IMM.IDPT / EG.ELC.ACCS.ZS / BAR.SCHL.15UP.FE
 scripts/build-geo.mjs         国界重建：world-atlas TopoJSON → GeoJSON → data/geo.js
 scripts/countries-110m.json   构建素材：world-atlas@2
 scripts/iso-codes.json        构建素材：ISO numeric → alpha2 映射
@@ -78,7 +82,7 @@ scripts/fetch-remote.mjs      命令行被墙时用浏览器抓取远程文本�
 - 指标：**World Bank WDI** `SH.DYN.MORT`（5 岁以下儿童死亡率，每 1000 活产儿）、`SP.DYN.LE00.IN`（出生时预期寿命，岁）；气泡图另用 `NY.GDP.PCAP.PP.CD`（人均 GDP，PPP 国际元）与 `SP.POP.TOTL`（总人口）。
 - 国界：**Natural Earth 110m**（经 world-atlas@2），177 个国家多边形，全部能与 WDI 数据对上 ISO2。
 - 覆盖：245 个地图区域，其中 196 个有数据；无数据的国家在地球上是中性灰，悬停显示「暂无数据」，不填任何估算值。
-- 详情页另有 4 个可按国家拆开的指标（疫苗率、电力可及率、0—14 岁人口占比、女性平均受教育年限），来自同样的 WDI，见 `data/indicators.js`。
+- 详情页另有 3 个可按国家拆开的指标（疫苗率、电力可及率、女性平均受教育年限），来自同样的 WDI，见 `data/indicators.js`。
 - 重建：`node scripts/build-data.mjs`、`node scripts/build-bubble.mjs`、`node scripts/build-geo.mjs`、`node scripts/build-indicators.mjs`（均需网络，只在开发期运行）；页面本身永远不联网。
 
 ### 为什么数据都是 `.js`
@@ -100,47 +104,52 @@ scripts/fetch-remote.mjs      命令行被墙时用浏览器抓取远程文本�
 | 3 个 KPI 随年份重算 | 中位数、高于 50‰ 国家数、低于 10‰ 国家数——三个数字讲清"世界在变好" |
 | 滚出视口 / 切后台自动暂停 | 不白烧电；`prefers-reduced-motion` 下不自转、直接停在 2024 |
 | 手写 SVG 折线图（详情页） | 需要"缺 1 年就断线"、随容器重算、可展开数据表 |
-| 详情页用滚动叙事，而不是卡片瀑布 | 一个数字一段话地推进，比一屏塞满图表更像"讲故事"；`IntersectionObserver` 触发离散状态，状态间只动 transform/opacity |
+| 详情页用 `sticky` 双屏舞台，而不是锁滚动 | 进度 `--p` 是滚动位置的纯函数（字号/位移/透明度都由它插值），没有状态机，所以上滚天然可逆，也不会"滑过去回不来"；只有 transform 与字号在动 |
 | 气泡图坐标轴写死量程（GDP 250—200000、寿命 25—88） | 量程固定，气泡才会真的"往右上角挪"；量程跟着数据走的话，看起来就是原地抖动 |
 | hash 路由 | `file://` 下 `pushState` 受限，hash 的直链/刷新/后退都安全 |
 
-## 详情页：指标切换 + 三段式区块
+## 详情页：双屏滚动
 
-整页没有任何滚动锁定、没有 scroll-snap、没有撑满视口的 sticky 画布 —— 三块内容都是普通的
-文档流区块，随便上下滚：
+`#/c/XX` 打开后是一个 200vh 的舞台，里面钉住 100vh 的视口。没有滚动锁定、没有 scroll-snap：
+进度 `--p`（0 → 1）就是「滚过了多少」，所以向上滚必然原路退回。
 
-| 区块 | 高度 | 内容 |
-|---|---|---|
-| 顶部固定条 | 约 119px | 返回 + 国家名 + 一排可横向滑动的指标胶囊（sticky） |
-| 1 数字 + 折线 | `min-height: 80vh` | 左：`[ 国家 ]` + 指标名 + 起点 → 连接线 → 巨大终值；右：该指标的折线 |
-| 2 气泡图 | 约一屏 | Gapminder：横轴人均 GDP（对数），纵轴预期寿命，面积=人口，颜色=地区 |
-| 3 尾注 | 自适应 | 指标跨度、WDI 指标号、可展开的数据表 |
+| 屏 | 内容 |
+|---|---|
+| 第 1 屏 Hero | 屏幕正中：`[ 国家 ]` + 当前指标 + 起点 → 连接线 → 巨大终值；顶部一枚透明胶囊显示当前指标，点开可下拉切换；底部一行极小的「向下滚动」 |
+| 第 2 屏 Detail | 数字缩小并平移到左栏（字号、位移、栏宽都由 `--p` 插值），折线从右侧滑出，顶部胶囊栏（Pill Tabs）淡入；上滚即逆向收回 |
+| 气泡图 | 紧随舞台之后，进视口才创建 |
+| 尾注 | 指标跨度、WDI 指标号、可展开的数据表 |
 
-### 指标（6 个，全部按国家拆开）
+### 指标（5 个，全部按国家拆开）
 
 | 指标 | 单位 | WDI | 覆盖 |
 |---|---|---|---|
-| 5岁以下儿童死亡率（默认选中） | ‰ | `SH.DYN.MORT` | 196 国 |
-| 预期寿命 | 岁 | `SP.DYN.LE00.IN` | 196 国 |
+| 5岁以下儿童死亡率 | ‰ | `SH.DYN.MORT` | 196 国 |
+| 预期寿命 | 岁 | `SP.DYN.LE00.IN` | 215 国 |
 | 一岁儿童疫苗接种率 | % | `SH.IMM.IDPT` | 193 国 |
 | 电力可及率 | % | `EG.ELC.ACCS.ZS` | 214 国 |
-| 0—14 岁人口占比 | % | `SP.POP.0014.TO.ZS` | 215 国 |
 | 女性平均受教育年限 | 年 | `BAR.SCHL.15UP.FE` | 144 国（5 年一档） |
 
-前两个在 `data/data.js`，后四个由 `scripts/build-indicators.mjs` 抓成 `data/indicators.js`
+前两个在 `data/data.js`，后三个由 `scripts/build-indicators.mjs` 抓成 `data/indicators.js`
 （一次 `country/all` 请求拿全量，构建期抓取，运行时零请求）。某个国家缺哪项，那颗胶囊就置灰、
-进不去；一个都没有的国家退回纯文字页。
+进不去；一个都没有的国家退回纯文字页。菜单与数据映射里都不再包含「0—14 岁人口占比」。
 
-- 点胶囊 → 左侧数字、单位、起点、年份、右侧 Y 轴与数据线一起换；换完如果这块在视口里，动画重播一次
-- **进入播、离开重置**：`IntersectionObserver`（`threshold 0.4`）只看「这块够不够显眼」，
-  滚走就 `reset()`（数字回起点、折线清空），滚回来再播一次；向上滚同样能重播
-- 动画节奏不变：先停 0.5 秒把起点读清楚，再用 3 秒 `easeInOutCubic` 落到最新一年；折线进度直接取数字补间的那个缓动值，笔尖和数字同起同落
+### 状态：一份指标，两处控件
+
+- 唯一真相是 `GPM.state`（`assets/js/metrics.js`）：初值 = 你在地球页选中的指标，写进 `localStorage`，
+  刷新和跨页都不丢，不会重置成儿童死亡率
+- 第一屏的下拉胶囊、第二屏的胶囊栏都只做两件事：读 `GPM.state.get()` 上色、写 `GPM.state.set()`
+- 换指标：数字与折线淡出（170ms）→ 换数据、重算 Y 轴 → 淡入 → 重新播一遍跳动；两处控件同时高亮，
+  连点也不会错乱（`swapToken` 只让最后一次生效）
+- 若该国缺当前指标：本页退到第一个有数据的指标，但**不改**全局状态，回到地球仍是原来的选择
+
+### 动效
+
+- 数字：先停 0.5 秒把起点读清楚，再用 3 秒 `easeInOutCubic` 落到最新一年；折线进度直接取数字补间的
+  那个缓动值，笔尖和数字同起同落
 - 连接线的箭头跟着指标方向翻：数值整体在跌就朝下（`scaleY(-1)` 由 `data-dir` 控制）
-- 终值颜色看指标语义：跌了更好（儿童死亡率）走绿，涨了更好走绿，涨跌都不代表好坏（儿童人口占比）走中性青，变差走暗红
-- 气泡图懒创建：第一次进视口才建，之后用自带时间轴（▶ 播放约 14 秒跑完 1990—2024、拖动、键盘左右）
-- `≤900` 上下分栏（1024 仍是左右两栏）；手机端胶囊栏横向滑动、右侧有渐隐提示
-- `prefers-reduced-motion` 下数字直接落定、折线直接画完
-- 数字落定后终值仍写在 DOM 里（`#stBig`），读屏与搜索都能读到
+- 终值颜色看指标语义：变好走绿、变差走暗红、方向不明走中性青
+- `≤900` 变成上下两段（数字在上、折线在下），同样由 `--p` 驱动；`prefers-reduced-motion` 下数字直接落定、折线直接画完
 
 ## 已知限制
 

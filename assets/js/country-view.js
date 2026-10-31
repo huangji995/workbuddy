@@ -1,6 +1,6 @@
-/* 国家详情：顶部指标胶囊栏 + 左侧大字报 + 右侧折线 + 气泡图。
-   没有整页吸附、没有锁滚动条：三块都是普通文档流里的区块，
-   IntersectionObserver 只负责回答「这块现在该不该播动画」。 */
+/* 国家详情：双屏滚动叙事（Hero → Detail）+ 全局指标状态。
+   第 1 屏：屏幕正中一个巨大数字；第 2 屏：数字缩小左移，折线从右侧滑出。
+   两屏之间不是「锁死滚动」，就是普通滚动，进度完全由滚动位置决定，所以上滚必然可逆。 */
 (function () {
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
@@ -11,16 +11,6 @@
   /* 动画节奏：先停 0.5 秒让人看清起点，再用 3 秒落到最新一年 */
   var PAUSE = 500;
   var DUR = 3000;
-
-  /* 指标表：u5mr / lifeExp 来自 data.js，其余来自 data/indicators.js（世界银行快照） */
-  var INDICATORS = [
-    { key: 'u5mr', label: '5岁以下儿童死亡率', unit: '‰', unitLong: '每 1000 活产儿', decimals: 1, betterWhen: 'down', color: '#22D3EE', code: 'SH.DYN.MORT' },
-    { key: 'lifeExp', label: '预期寿命', unit: '岁', unitLong: '出生时预期寿命', decimals: 1, betterWhen: 'up', color: '#A78BFA', code: 'SP.DYN.LE00.IN' },
-    { key: 'dtp3', label: '一岁儿童疫苗接种率', unit: '%', unitLong: 'DTP3 疫苗，1 岁前', decimals: 1, betterWhen: 'up', color: '#34D399', pct: true, code: 'SH.IMM.IDPT' },
-    { key: 'electricity', label: '电力可及率', unit: '%', unitLong: '能用上电的人口比例', decimals: 1, betterWhen: 'up', color: '#FBBF24', pct: true, code: 'EG.ELC.ACCS.ZS' },
-    { key: 'childShare', label: '0—14 岁人口占比', unit: '%', unitLong: '儿童占总人口', decimals: 1, betterWhen: null, color: '#F472B6', pct: true, code: 'SP.POP.0014.TO.ZS' },
-    { key: 'schooling', label: '女性平均受教育年限', unit: '年', unitLong: '25 岁以上女性，Barro-Lee', decimals: 1, betterWhen: 'up', color: '#60A5FA', maxGap: 6, code: 'BAR.SCHL.15UP.FE' }
-  ];
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
@@ -35,31 +25,11 @@
     return Number(v).toFixed(dec);
   }
 
-  /* 指标序列：从 1990 起算（与地图、气泡图同一个时间窗），首尾就是「起点 / 最新」 */
-  function metricOf(D, iso2, key) {
-    var raw = null;
-    if (key === 'u5mr' || key === 'lifeExp') {
-      var c = D.countries[iso2];
-      raw = c && c[key] ? c[key].series : null;
-    } else {
-      var ext = window.__GPM_IND__;
-      raw = ext && ext.series && ext.series[key] ? ext.series[key][iso2] : null;
-    }
-    if (!raw || raw.length < 2) return null;
-    var series = raw.filter(function (p) { return p[0] >= 1990; });
-    if (series.length < 2) return null;
-    var base = { year: series[0][0], value: series[0][1] };
-    var last = { year: series[series.length - 1][0], value: series[series.length - 1][1] };
-    var delta = Math.round((last.value - base.value) * 10) / 10;
-    var deltaPct = base.value ? Math.round((delta / Math.abs(base.value)) * 1000) / 10 : null;
-    return { series: series, base: base, last: last, delta: delta, deltaPct: deltaPct };
-  }
-
   function domainFor(series, ind) {
     var vals = series.map(function (p) { return p[1]; });
     var max = Math.max.apply(null, vals);
     var min = Math.min.apply(null, vals);
-    if (ind.pct) {
+    if (ind.unit === '%') {
       var lo = Math.max(0, Math.floor((min - 3) / 5) * 5);
       var hi = Math.min(100, Math.ceil((max + 2) / 5) * 5);
       return [lo, hi > lo ? hi : lo + 5];
@@ -89,25 +59,27 @@
       return function () { mount.innerHTML = ''; };
     }
 
+    var nameZh = esc(c.nameZh);
+
     /* 这个国家有哪些指标真的有数据 */
-    var available = {};
     var metrics = {};
-    INDICATORS.forEach(function (ind) {
-      var mm = metricOf(D, iso2, ind.key);
-      if (mm) { available[ind.key] = true; metrics[ind.key] = mm; }
+    var avail = {};
+    GPM.INDICATORS.forEach(function (m) {
+      var mm = GPM.metricOf(iso2, m.key);
+      if (mm) { avail[m.key] = true; metrics[m.key] = mm; }
     });
-    var keys = INDICATORS.filter(function (ind) { return available[ind.key]; })
-      .map(function (ind) { return ind.key; });
+    var keys = GPM.INDICATORS.filter(function (m) { return avail[m.key]; })
+      .map(function (m) { return m.key; });
 
     var hasBubble = !!(window.__GPM_BUBBLE__ && window.__GPM_BUBBLE__.gdp[iso2]);
 
     if (!keys.length) {
       mount.innerHTML = '<section class="view view-country story-plain">'
         + '<a class="back" href="#/">← 返回地图</a>'
-        + '<header class="country-head"><h1>' + esc(c.nameZh) + '</h1>'
+        + '<header class="country-head"><h1>' + nameZh + '</h1>'
         + '<p class="country-meta">' + esc([c.nameEn, c.region].filter(Boolean).join(' · ')) + '</p></header>'
         + '<div class="notice"><strong>这个地区没有可展示的数据。</strong>'
-        + '<p>世界银行 WDI 未收录' + esc(c.nameZh) + '的这些指标，所以这里不做任何估算或填充，地图上也保持中性灰。</p>'
+        + '<p>世界银行 WDI 未收录' + nameZh + '的这些指标，所以这里不做任何估算或填充，地图上也保持中性灰。</p>'
         + '<p class="notice-more">本页共收录 ' + D.meta.countriesTotal + ' 个国家与地区，其中 '
         + D.meta.countriesWithData + ' 个有儿童死亡率数据。'
         + '<a class="notice-link" href="#/">回到地图选一个 →</a></p></div>'
@@ -115,70 +87,110 @@
       return function () { mount.innerHTML = ''; };
     }
 
-    /* 默认「5岁以下儿童死亡率」，没有就退到第一个有数据的 */
-    var sel = available.u5mr ? 'u5mr' : keys[0];
-    var nameZh = esc(c.nameZh);
+    /* 选中指标：默认继承在地球页选中的那一项；该国没数据时退到第一个可用的 */
+    var sel = GPM.state.get();
+    if (!avail[sel]) sel = keys[0];
 
-    var tabsHTML = INDICATORS.map(function (ind) {
+    var tabsHTML = GPM.INDICATORS.map(function (ind) {
       var on = ind.key === sel;
-      var off = !available[ind.key];
+      var off = !avail[ind.key];
       return '<button class="tab' + (on ? ' is-on' : '') + (off ? ' is-off' : '') + '"'
         + ' type="button" role="tab" aria-selected="' + (on ? 'true' : 'false') + '"'
         + (off ? ' disabled' : '') + ' data-key="' + ind.key + '">'
         + esc(ind.label) + '</button>';
     }).join('');
 
+    var menuHTML = GPM.INDICATORS.map(function (ind) {
+      var off = !avail[ind.key];
+      return '<button class="pick-item' + (off ? ' is-off' : '') + '" type="button" role="option"'
+        + ' aria-selected="' + (ind.key === sel ? 'true' : 'false') + '"'
+        + (off ? ' disabled' : '') + ' data-key="' + ind.key + '">'
+        + '<span class="pick-item-k">' + esc(ind.label) + '</span>'
+        + '<span class="pick-item-v">' + esc(ind.unit) + '</span>'
+        + '</button>';
+    }).join('');
+
     mount.innerHTML = ''
       + '<section class="story" id="story">'
-      + '  <div class="story-top">'
-      + '    <nav class="story-nav">'
-      + '      <a class="story-back" href="#/">← 返回地图</a>'
-      + '      <span class="story-id"><b>' + nameZh + '</b><em>' + esc(c.region || '') + '</em></span>'
-      + '    </nav>'
-      + '    <div class="tabs-wrap"><div class="tabs" role="tablist" aria-label="切换指标" id="tabs">'
-      + tabsHTML
-      + '    </div></div>'
-      + '  </div>'
 
-      /* ---------- 第 1 块：数字 + 折线 ---------- */
-      + '  <section class="hero-block" id="hero">'
-      + '    <div class="hero-left">'
-      + '      <p class="hero-tag"><b id="heroCountry">[ ' + nameZh + ' ]</b><span id="heroInd"></span></p>'
-      + '      <div class="st-cmp">'
-      + '        <p class="st-from"><span class="st-from-k" id="stFromYear">1990 年</span>'
-      + '          <span class="st-from-v"><b id="stFromVal">—</b><em id="stFromUnit"></em></span></p>'
-      + '        <span class="st-drop" aria-hidden="true">'
-      + '          <svg class="st-drop-svg" width="18" height="60" viewBox="0 0 18 60" fill="none">'
-      + '            <defs>'
-      + '              <linearGradient id="stDropGrad" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">'
-      + '                <stop offset="0" stop-color="#22D3EE" stop-opacity="0"/>'
-      + '                <stop offset="0.4" stop-color="#22D3EE" stop-opacity="0.45"/>'
-      + '                <stop offset="1" stop-color="#22D3EE" stop-opacity="1"/>'
-      + '              </linearGradient>'
-      + '            </defs>'
-      + '            <path d="M9 0V52" stroke="#22D3EE" stroke-width="4" stroke-opacity="0.12" stroke-linecap="round"/>'
-      + '            <path d="M9 0V52" stroke="url(#stDropGrad)" stroke-width="1.2" stroke-linecap="round"/>'
-      + '            <path d="M4.6 46.8 9 52.6l4.4-5.8" stroke="url(#stDropGrad)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>'
+      /* ================= 双屏舞台：200vh，里面钉一个 100vh 的视口 ================= */
+      + '  <div class="stage" id="stage">'
+      + '    <div class="pin" id="pin" style="--p:0">'
+
+      /* 顶栏：返回 + 地区（第二屏出现时不遮挡胶囊） */
+      + '      <div class="pin-bar">'
+      + '        <a class="story-back" href="#/">← 返回地图</a>'
+      + '        <span class="pin-id">' + esc([c.region, c.nameEn].filter(Boolean).join(' · ')) + '</span>'
+      + '      </div>'
+
+      /* 第一屏：极简透明胶囊 + 下拉 */
+      + '      <div class="ind-pick" id="indPick">'
+      + '        <button class="pick-btn" id="pickBtn" type="button" aria-haspopup="listbox" aria-expanded="false">'
+      + '          <i class="pick-dot" aria-hidden="true"></i>'
+      + '          <b id="pickLabel">' + esc(GPM.indicator(sel).label) + '</b>'
+      + '          <svg class="pick-caret" viewBox="0 0 12 12" aria-hidden="true">'
+      + '            <path d="M2.5 4.4 6 7.9l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4"'
+      + '              stroke-linecap="round" stroke-linejoin="round"/>'
       + '          </svg>'
-      + '        </span>'
-      + '        <div class="st-to">'
-      + '          <p class="st-tick"><b id="stYear">—</b><em>年</em>'
-      + '            <span class="st-tick-now" id="stNow">今天</span></p>'
-      + '          <div class="st-big"><b id="stBig">—</b><i class="st-unit" id="stUnit"></i></div>'
+      + '        </button>'
+      + '        <div class="pick-menu" id="pickMenu" role="listbox" aria-label="切换指标">' + menuHTML + '</div>'
+      + '      </div>'
+
+      /* 第二屏：横向胶囊导航 */
+      + '      <div class="pin-tabs" id="pinTabs">'
+      + '        <div class="tabs" role="tablist" aria-label="切换指标" id="tabs">' + tabsHTML + '</div>'
+      + '      </div>'
+
+      /* 数字层：从正中缩到左栏 */
+      + '      <div class="pin-num" id="numStage">'
+      + '        <div class="num-in">'
+      + '          <p class="hero-tag"><b>[ ' + nameZh + ' ]</b><span id="heroInd"></span></p>'
+      + '          <div class="st-cmp">'
+      + '            <p class="st-from"><span class="st-from-k" id="stFromYear">1990 年</span>'
+      + '              <span class="st-from-v"><b id="stFromVal">—</b><em id="stFromUnit"></em></span></p>'
+      + '            <span class="st-drop" aria-hidden="true">'
+      + '              <svg class="st-drop-svg" width="18" height="60" viewBox="0 0 18 60" fill="none">'
+      + '                <defs>'
+      + '                  <linearGradient id="stDropGrad" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">'
+      + '                    <stop offset="0" stop-color="#22D3EE" stop-opacity="0"/>'
+      + '                    <stop offset="0.4" stop-color="#22D3EE" stop-opacity="0.45"/>'
+      + '                    <stop offset="1" stop-color="#22D3EE" stop-opacity="1"/>'
+      + '                  </linearGradient>'
+      + '                </defs>'
+      + '                <path d="M9 0V52" stroke="#22D3EE" stroke-width="4" stroke-opacity="0.12" stroke-linecap="round"/>'
+      + '                <path d="M9 0V52" stroke="url(#stDropGrad)" stroke-width="1.2" stroke-linecap="round"/>'
+      + '                <path d="M4.6 46.8 9 52.6l4.4-5.8" stroke="url(#stDropGrad)" stroke-width="1.2"'
+      + '                  stroke-linecap="round" stroke-linejoin="round"/>'
+      + '              </svg>'
+      + '            </span>'
+      + '            <div class="st-to">'
+      + '              <p class="st-tick"><b id="stYear">—</b><em>年</em>'
+      + '                <span class="st-tick-now" id="stNow">今天</span></p>'
+      + '              <div class="st-big"><b id="stBig">—</b><i class="st-unit" id="stUnit"></i></div>'
+      + '            </div>'
+      + '          </div>'
       + '        </div>'
       + '      </div>'
-      + '    </div>'
-      + '    <div class="hero-right">'
-      + '      <div class="chart-head">'
-      + '        <h2 class="chart-title" id="chartTitle"></h2>'
-      + '        <span class="chart-sub" id="chartSub"></span>'
-      + '        <span class="chart-delta" id="chartDelta"></span>'
-      + '      </div>'
-      + '      <div class="chart" id="heroChart"></div>'
-      + '    </div>'
-      + '  </section>'
 
-      /* ---------- 第 2 块：气泡图 ---------- */
+      /* 折线层：第二屏从右侧滑入 */
+      + '      <div class="pin-chart" id="chartStage">'
+      + '        <div class="chart-head">'
+      + '          <h2 class="chart-title" id="chartTitle"></h2>'
+      + '          <span class="chart-sub" id="chartSub"></span>'
+      + '          <span class="chart-delta" id="chartDelta"></span>'
+      + '        </div>'
+      + '        <div class="chart" id="heroChart"></div>'
+      + '      </div>'
+
+      /* 第一屏底部：极小的滚动提示 */
+      + '      <p class="pin-hint" id="scrollHint"><span>向下滚动</span>'
+      + '        <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v9M3.4 7.9 7 11.5l3.6-3.6"'
+      + '          fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"'
+      + '          stroke-linejoin="round"/></svg></p>'
+      + '    </div>'
+      + '  </div>'
+
+      /* ================= 气泡图 ================= */
       + (hasBubble
         ? '  <section class="story-bubble" id="bubbleSec">'
         + '    <p class="st-hud-title"><i aria-hidden="true">[</i><span>全球各国：收入与寿命的变迁</span>'
@@ -187,7 +199,7 @@
         + '  </section>'
         : '')
 
-      /* ---------- 第 3 块：尾注 + 数据表 ---------- */
+      /* ================= 尾注 + 数据表 ================= */
       + '  <section class="story-tail">'
       + '    <div class="story-tail-in">'
       + '      <p class="story-tail-k">' + esc(c.region || '') + ' · ' + nameZh + '</p>'
@@ -199,11 +211,18 @@
       + '  </section>'
       + '</section>';
 
-    var hero = mount.querySelector('#hero');
-    var heroLeft = mount.querySelector('.hero-left');
-    var heroRight = mount.querySelector('.hero-right');
+    /* ---------- 节点 ---------- */
+    var story = mount.querySelector('#story');
+    var stage = mount.querySelector('#stage');
+    var pin = mount.querySelector('#pin');
+    var numStage = mount.querySelector('#numStage');
+    var chartStage = mount.querySelector('#chartStage');
     var chartEl = mount.querySelector('#heroChart');
     var tabBox = mount.querySelector('#tabs');
+    var pickBtn = mount.querySelector('#pickBtn');
+    var pickLabel = mount.querySelector('#pickLabel');
+    var pickMenu = mount.querySelector('#pickMenu');
+    var indPick = mount.querySelector('#indPick');
     var bigEl = mount.querySelector('#stBig');
     var yearEl = mount.querySelector('#stYear');
     var fromYearEl = mount.querySelector('#stFromYear');
@@ -217,15 +236,15 @@
     var deltaEl = mount.querySelector('#chartDelta');
     var tailNoteEl = mount.querySelector('#tailNote');
     var tailTableEl = mount.querySelector('#tailTable');
-    var story = mount.querySelector('#story');
 
-    /* ---------- 动画状态 ---------- */
+    /* ---------- 指标状态 ---------- */
     var m = metrics[sel];
-    var ind = INDICATORS.filter(function (x) { return x.key === sel; })[0];
+    var ind = GPM.indicator(sel);
     var chartView = null;
     var raf = null;
     var progress = 0;
-    var inView = false;
+    var swapToken = 0;
+    var menuOpen = false;
 
     function setNum(v) { bigEl.textContent = numText(v, ind.decimals); }
     function setYear(y) { yearEl.textContent = String(y); }
@@ -252,15 +271,12 @@
       nowEl.hidden = false;
     }
 
-    function reset() {
+    function stopAnim() {
       if (raf) { cancelAnimationFrame(raf); raf = null; }
-      story.classList.remove('is-settled', 'is-rolling');
-      nowEl.hidden = true;
-      paintBase();
     }
 
     function play() {
-      if (raf) { cancelAnimationFrame(raf); raf = null; }
+      stopAnim();
       if (DECOR) { settle(); return; }
       story.classList.remove('is-settled');
       story.classList.add('is-rolling');
@@ -290,8 +306,9 @@
     /* ---------- 折线 ---------- */
     function chartHeight() {
       var head = mount.querySelector('.chart-head');
-      var h = heroRight.clientHeight - (head ? head.offsetHeight : 44) - 30;
-      return Math.max(150, Math.min(420, Math.round(h)));
+      /* chart.js 还要在上下各加 18 / 36px 的轴留白，一起扣掉，否则窄屏会被裁掉年份 */
+      var h = chartStage.clientHeight - (head ? head.offsetHeight : 44) - 70;
+      return Math.max(140, Math.min(560, Math.round(h)));
     }
 
     function drawChart() {
@@ -324,13 +341,11 @@
       var pct = m.deltaPct;
       deltaEl.textContent = pct === null ? '' : (pct > 0 ? '+' : '') + pct.toFixed(1) + '%';
 
-      var improved = null;
-      if (ind.betterWhen === 'down') improved = m.delta < 0;
-      else if (ind.betterWhen === 'up') improved = m.delta > 0;
-      story.dataset.trend = improved === null ? 'flat' : improved ? 'up' : 'down';
+      var better = GPM.isBetter(ind, m.delta);
+      story.dataset.trend = better === null ? 'flat' : better ? 'up' : 'down';
       story.dataset.dir = m.delta < 0 ? 'down' : 'up';
-      deltaEl.classList.toggle('is-good', improved === true);
-      deltaEl.classList.toggle('is-bad', improved === false);
+      deltaEl.classList.toggle('is-good', better === true);
+      deltaEl.classList.toggle('is-bad', better === false);
 
       var headEl = mount.querySelector('#tailHead');
       if (headEl) headEl.textContent = (m.last.year - m.base.year) + ' 年，一条线。';
@@ -340,61 +355,141 @@
       tailTableEl.innerHTML = tableHTML(m, ind);
     }
 
-    /* ---------- 切指标 ---------- */
-    function updateTabs() {
+    /* ---------- 控件：下拉胶囊 + 胶囊栏，双向同一份状态 ---------- */
+    function syncControls() {
+      pickLabel.textContent = ind.label;
       Array.prototype.forEach.call(tabBox.querySelectorAll('.tab'), function (btn) {
+        var on = btn.getAttribute('data-key') === sel;
+        btn.classList.toggle('is-on', on);
+        btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      Array.prototype.forEach.call(pickMenu.querySelectorAll('.pick-item'), function (btn) {
         var on = btn.getAttribute('data-key') === sel;
         btn.classList.toggle('is-on', on);
         btn.setAttribute('aria-selected', on ? 'true' : 'false');
       });
     }
 
-    function selectTab(key) {
-      if (key === sel || !available[key]) return;
+    function openMenu() {
+      if (menuOpen) return;
+      menuOpen = true;
+      indPick.classList.add('is-open');
+      pickBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closeMenu() {
+      if (!menuOpen) return;
+      menuOpen = false;
+      indPick.classList.remove('is-open');
+      pickBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    /* 换指标：淡出 → 换数据重画 → 淡入 → 重新播跳动 */
+    function applyIndicator(key) {
       sel = key;
       m = metrics[key];
-      ind = INDICATORS.filter(function (x) { return x.key === key; })[0];
-      updateTabs();
-      heroLeft.classList.add('is-swap');
+      ind = GPM.indicator(key);
+      syncControls();
+      stopAnim();
+      var my = ++swapToken;
+      numStage.classList.add('is-swap');
+      chartStage.classList.add('is-swap');
       setTimeout(function () {
-        /* 换指标时把上一轮的「已落定」清掉，否则数字回到起点但「今天」标签还挂着 */
-        if (raf) { cancelAnimationFrame(raf); raf = null; }
+        if (my !== swapToken) return;
         story.classList.remove('is-settled', 'is-rolling');
         nowEl.hidden = true;
         applyMeta();
         drawChart();
         paintBase();
-        heroLeft.classList.remove('is-swap');
-        if (inView) play();
-      }, 150);
+        numStage.classList.remove('is-swap');
+        chartStage.classList.remove('is-swap');
+        play();
+      }, DECOR ? 0 : 170);
     }
 
-    tabBox.addEventListener('click', function (e) {
-      var btn = e.target.closest ? e.target.closest('.tab') : null;
-      if (!btn || btn.disabled) return;
-      selectTab(btn.getAttribute('data-key'));
+    function choose(key) {
+      closeMenu();
+      if (!avail[key] || key === sel) return;
+      /* 全局状态已经等于它（本页因缺数据回退过）：直接切，避免 set 空转 */
+      if (GPM.state.get() === key) applyIndicator(key);
+      else GPM.state.set(key);     // 广播，订阅里统一 applyIndicator
+    }
+
+    var offState = GPM.state.subscribe(function (key) {
+      if (key !== sel && avail[key]) applyIndicator(key);
     });
 
+    function onTabsClick(e) {
+      var btn = e.target.closest ? e.target.closest('.tab') : null;
+      if (!btn || btn.disabled) return;
+      choose(btn.getAttribute('data-key'));
+    }
+    tabBox.addEventListener('click', onTabsClick);
+
+    function onMenuClick(e) {
+      var btn = e.target.closest ? e.target.closest('.pick-item') : null;
+      if (!btn || btn.disabled) return;
+      choose(btn.getAttribute('data-key'));
+    }
+    pickMenu.addEventListener('click', onMenuClick);
+
+    function onPickClick(e) {
+      e.stopPropagation();
+      if (menuOpen) closeMenu(); else openMenu();
+    }
+    pickBtn.addEventListener('click', onPickClick);
+    pickBtn.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeMenu();
+    });
+
+    function onDocDown(e) {
+      if (menuOpen && !indPick.contains(e.target)) closeMenu();
+    }
+    document.addEventListener('pointerdown', onDocDown);
+
+    /* ---------- 滚动进度：0 = 巨大数字，1 = 左数字 + 右折线 ---------- */
+    var scrollP = 0;
+    var heroMode = true;
+    var ticking = false;
+
+    function setP(v) {
+      scrollP = v < 0 ? 0 : v > 1 ? 1 : v;
+      pin.style.setProperty('--p', scrollP.toFixed(4));
+      var hero = scrollP < 0.52;
+      if (hero !== heroMode) {
+        heroMode = hero;
+        story.dataset.scr = hero ? 'hero' : 'detail';
+        if (!hero) closeMenu();
+      }
+    }
+
+    function measure() {
+      var total = stage.offsetHeight - window.innerHeight;
+      if (total <= 0) { setP(0); return; }
+      setP(-stage.getBoundingClientRect().top / total);
+    }
+
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () { ticking = false; measure(); });
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    /* ---------- 首帧 ---------- */
+    story.dataset.scr = 'hero';
+    syncControls();
     applyMeta();
     drawChart();
     paintBase();
 
-    // 首帧之后再触发入场，避免和 innerHTML 同帧
-    requestAnimationFrame(function () { story.classList.add('is-in'); });
+    /* 路由在这一帧之后才把页面滚回顶部，所以量进度要等一帧，避免开门就闪第二屏 */
+    requestAnimationFrame(function () {
+      measure();
+      story.classList.add('is-in');
+      play();
+    });
 
-    /* ---------- 第 1 块：进视口播一次，离开复位，回来再播 ---------- */
-    var heroIO = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        var now = e.isIntersecting && e.intersectionRatio >= 0.4;
-        if (now === inView) return;
-        inView = now;
-        if (inView) play();
-        else reset();
-      });
-    }, { threshold: [0, 0.4, 0.8] });
-    heroIO.observe(hero);
-
-    /* ---------- 第 2 块：气泡图（懒创建，第一次进视口自动播） ---------- */
+    /* ---------- 气泡图：进视口懒创建、只播一次 ---------- */
     var bubble = null;
     var bubblePlayed = false;
 
@@ -426,10 +521,12 @@
     function onResize() {
       clearTimeout(rt);
       rt = setTimeout(function () {
+        measure();
         drawChart();
         if (bubble) {
           bubble.destroy();
           bubble = null;
+          bubblePlayed = false;
           ensureBubble();
         }
       }, 220);
@@ -438,9 +535,11 @@
 
     return function cleanup() {
       clearTimeout(rt);
-      if (raf) cancelAnimationFrame(raf);
+      stopAnim();
+      offState();
+      window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
-      heroIO.disconnect();
+      document.removeEventListener('pointerdown', onDocDown);
       if (bubbleIO) bubbleIO.disconnect();
       if (bubble) bubble.destroy();
       mount.innerHTML = '';

@@ -71,7 +71,9 @@
    * 连续色阶：把 thresholds 当作锚点，锚点之间线性插值。
    * 离散分档在时间动画里会「跳色」，连续色阶才能让颜色随年份平滑流动。
    */
-  function rampColor(value, thresholds) {
+  /* invert=true：高值才是「好」的指标（寿命、电力、疫苗），把色阶反过来，
+     让红色永远表示「糟糕的那一端」，两种方向的地图读法一致 */
+  function rampColor(value, thresholds, invert) {
     if (value === null || value === undefined || isNaN(value)) return PALETTE.noData;
     var n = thresholds.length;
     var t = 1;
@@ -87,17 +89,17 @@
         }
       }
     }
-    var c = rampAt(t);
+    var c = rampAt(invert ? 1 - t : t);
     return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
   }
 
   /** 图例渐变条用的色标（与 rampColor 走同一条曲线） */
-  function rampStops(thresholds) {
+  function rampStops(thresholds, invert) {
     var n = thresholds.length;
     var out = [];
     for (var i = 0; i < n; i++) {
       var at = i / (n - 1);
-      out.push({ at: at, color: rampHex(at) });
+      out.push({ at: at, color: rampHex(invert ? 1 - at : at) });
     }
     return out;
   }

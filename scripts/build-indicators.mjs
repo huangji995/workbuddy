@@ -17,7 +17,6 @@ const END = 2024;
 const CODES = [
   { key: 'dtp3', code: 'SH.IMM.IDPT', label: '一岁儿童疫苗接种率', short: '疫苗率', unit: '%', decimals: 1, betterWhen: 'up', pct: true },
   { key: 'electricity', code: 'EG.ELC.ACCS.ZS', label: '电力可及率', short: '电力', unit: '%', decimals: 1, betterWhen: 'up', pct: true },
-  { key: 'childShare', code: 'SP.POP.0014.TO.ZS', label: '0—14 岁人口占比', short: '儿童人口', unit: '%', decimals: 1, betterWhen: null, pct: true },
   { key: 'schooling', code: 'BAR.SCHL.15UP.FE', label: '女性平均受教育年限', short: '女性教育', unit: '年', decimals: 1, betterWhen: 'up', pct: false }
 ];
 
