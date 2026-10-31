@@ -157,9 +157,21 @@
       // 起点：小字号，先把锚点交代清楚
       + '          <p class="st-from"><span class="st-from-k">' + baseYear + ' 年</span>'
       + '            <span class="st-from-v">' + U.fmt(baseVal, 1) + '<em>' + copy.unit + '</em></span></p>'
-      // 中间：青色发光的坠落线，把上下两段连起来
-      + '          <span class="st-drop" aria-hidden="true"><i class="st-drop-line"></i>'
-      + '            <i class="st-drop-arrow">↓</i></span>'
+      // 中间：青色发光的坠落线，把上下两段连起来（一条路径画完，线头就是箭头）
+      + '          <span class="st-drop" aria-hidden="true">'
+      + '            <svg class="st-drop-svg" width="18" height="60" viewBox="0 0 18 60" fill="none">'
+      + '              <defs>'
+      + '                <linearGradient id="stDropGrad" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">'
+      + '                  <stop offset="0" stop-color="#22D3EE" stop-opacity="0"/>'
+      + '                  <stop offset="0.4" stop-color="#22D3EE" stop-opacity="0.45"/>'
+      + '                  <stop offset="1" stop-color="#22D3EE" stop-opacity="1"/>'
+      + '                </linearGradient>'
+      + '              </defs>'
+      + '              <path d="M9 0V52" stroke="#22D3EE" stroke-width="4" stroke-opacity="0.12" stroke-linecap="round"/>'
+      + '              <path d="M9 0V52" stroke="url(#stDropGrad)" stroke-width="1.2" stroke-linecap="round"/>'
+      + '              <path d="M4.6 46.8 9 52.6l4.4-5.8" stroke="url(#stDropGrad)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '            </svg>'
+      + '          </span>'
       // 终点：年份随数字一起跳，落定后亮起“今天”
       + '          <div class="st-to">'
       + '            <p class="st-tick"><b id="stYear">' + baseYear + '</b><em>年</em>'
@@ -228,6 +240,7 @@
       story.classList.add('is-settled');
       setNum(lastVal);
       setYear(lastYear);
+      applyChartProgress(1);      // 数字定格那一刻，笔尖正好收在终点
     }
 
     function resetNum() {
@@ -236,6 +249,7 @@
       if (numRaf) { cancelAnimationFrame(numRaf); numRaf = null; }
       setNum(baseVal);
       setYear(baseYear);
+      applyChartProgress(0);
     }
 
     function tweenNum(to) {
@@ -253,6 +267,7 @@
         var e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         setNum(from + (to - from) * e);
         setYear(Math.round(baseYear + (lastYear - baseYear) * e));
+        applyChartProgress(e);     // 右边那条线跟着笔尖一起长出来
         if (t < 1) numRaf = requestAnimationFrame(step);
         else { numRaf = null; settle(); }
       }
@@ -263,6 +278,15 @@
     // 叙事从 1990 起算：折线也只画 1990 之后，和地图、气泡图同一个时间窗
     function clip(ctx) {
       return ctx.series.filter(function (p) { return p[0] >= 1990; });
+    }
+
+    // 折线的绘制进度与左边数字共用一条时间线
+    var chartViews = [];
+    var chartProgress = 0;
+
+    function applyChartProgress(p) {
+      chartProgress = p;
+      for (var i = 0; i < chartViews.length; i++) chartViews[i].setProgress(p);
     }
 
     function drawCharts() {
@@ -293,10 +317,11 @@
       ].filter(function (b) { return b.series && b.series.length; });
 
       function draw(suffix, plotH) {
+        chartViews = [];
         blocks.forEach(function (b, i) {
           var el = mount.querySelector('#chart-' + suffix + '-' + b.key);
           if (!el) return;
-          GPM.chart.render(el, {
+          var view = GPM.chart.render(el, {
             series: b.series,
             color: b.color,
             unit: b.ind.unit,
@@ -309,7 +334,10 @@
             yFormat: function (v) { return String(Math.round(v)); },
             ariaLabel: c.nameZh + b.ind.label + '趋势，' + yearDomain[0] + ' 至 ' + yearDomain[1] + ' 年'
           });
+          if (view) chartViews.push(view);
         });
+        // 重绘（窗口尺寸变化）后要把当前进度补回去，不能让线重新变空
+        applyChartProgress(chartProgress);
       }
 
       draw('side', plotH);
@@ -400,8 +428,13 @@
     // 首帧之后再触发一次入场，避免和 innerHTML 同帧
     requestAnimationFrame(function () { story.classList.add('is-in'); });
 
+    // 只有叙事页开吸附：每滑一次正好停在一屏，画布不会被撕成半屏
+    var rootEl = document.documentElement;
+    rootEl.classList.add('snap-story');
+
     return function cleanup() {
       clearTimeout(rt);
+      rootEl.classList.remove('snap-story');
       window.removeEventListener('resize', onResize);
       io.disconnect();
       if (numRaf) cancelAnimationFrame(numRaf);

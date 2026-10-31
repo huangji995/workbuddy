@@ -114,41 +114,59 @@
     }
 
     // 折线（按缺口分段）：先铺一层半透明粗线做辉光，再画主线
+    // 两组 path 走同一套 dasharray，动画时前进量完全一致，不会错位
     var segs = splitSegments(series);
-    segs.forEach(function (seg) {
+    var segNodes = segs.map(function (seg) {
       var d = '';
       seg.forEach(function (p, i) {
         d += (i ? 'L' : 'M') + sx(p[0]).toFixed(2) + ' ' + sy(p[1]).toFixed(2);
       });
-      svg.appendChild(node('path', {
+      var glow = node('path', {
         d: d, fill: 'none', stroke: cfg.color, 'stroke-width': 7,
         'stroke-opacity': 0.14, 'stroke-linejoin': 'round', 'stroke-linecap': 'round'
-      }));
-      svg.appendChild(node('path', {
+      });
+      var line = node('path', {
         d: d, fill: 'none', stroke: cfg.color, 'stroke-width': 1.8,
         'stroke-linejoin': 'round', 'stroke-linecap': 'round'
-      }));
+      });
+      svg.appendChild(glow);
+      svg.appendChild(line);
+      return { glow: glow, line: line, len: 0, base: 0 };
     });
 
-    // 首尾点
+    // 首尾点：起点跟着笔尖亮，终点等画完再亮
     var first = series[0];
     var last = series[series.length - 1];
-    svg.appendChild(node('circle', { cx: sx(first[0]), cy: sy(first[1]), r: 2.6, fill: '#020617', stroke: cfg.color, 'stroke-width': 1.6 }));
-    svg.appendChild(node('circle', { cx: sx(last[0]), cy: sy(last[1]), r: 3.2, fill: cfg.color }));
+    var startDot = node('circle', {
+      cx: sx(first[0]), cy: sy(first[1]), r: 2.6,
+      fill: '#020617', stroke: cfg.color, 'stroke-width': 1.6, opacity: 0
+    });
+    svg.appendChild(startDot);
 
-    // 尾值标注
+    // 尾值标注（画到终点才浮现，避免提前剧透结果）
     var tailText = cfg.valueFormat ? cfg.valueFormat(last[1]) : String(last[1]);
     var tailX = sx(last[0]);
+    var tailY = sy(last[1]);
     var anchor = tailX > m.l + iw - 44 ? 'end' : 'start';
-    svg.appendChild(node('text', {
+    var tail = node('g', { class: 'ch-tail' });
+    tail.appendChild(node('circle', {
+      class: 'ch-halo', cx: tailX, cy: tailY, r: 9,
+      fill: 'none', stroke: cfg.color, 'stroke-width': 1.2, 'stroke-opacity': 0.55
+    }));
+    tail.appendChild(node('circle', {
+      class: 'ch-end', cx: tailX, cy: tailY, r: 3.4,
+      fill: cfg.color, stroke: '#020617', 'stroke-width': 1.2
+    }));
+    tail.appendChild(node('text', {
       x: tailX + (anchor === 'end' ? -8 : 8),
-      y: sy(last[1]) - 12,
+      y: tailY - 12,
       'text-anchor': anchor,
       'font-size': 14,
       'font-weight': 500,
       fill: cfg.color,
       'font-variant-numeric': 'tabular-nums'
     }, tailText));
+    svg.appendChild(tail);
 
     // 指针读数
     var cursor = node('g', { opacity: 0, 'pointer-events': 'none' });
@@ -174,6 +192,40 @@
     }
 
     container.appendChild(svg);
+
+    /* ---------- 逐点绘制：stroke-dasharray / dashoffset ---------- */
+    /* 分段按累计长度排队，进度 0→1 时笔尖从左往右扫过所有缺口，
+       有断线的国家也不会几段同时冒出来。dash 只写 style，不碰属性，省重排。 */
+    var totalLen = 0;
+    segNodes.forEach(function (s) {
+      s.len = s.line.getTotalLength() || 0;
+      s.base = totalLen;
+      totalLen += s.len;
+      [s.glow, s.line].forEach(function (p) {
+        p.style.strokeDasharray = s.len ? s.len.toFixed(2) : 'none';
+        p.style.strokeDashoffset = s.len ? s.len.toFixed(2) : '0';
+      });
+    });
+
+    var curProgress = -1;
+    function setProgress(p) {
+      p = p < 0 ? 0 : p > 1 ? 1 : p;
+      if (p === curProgress) return;
+      curProgress = p;
+      var budget = totalLen * p;
+      segNodes.forEach(function (s) {
+        if (!s.len) return;
+        var local = (budget - s.base) / s.len;
+        local = local < 0 ? 0 : local > 1 ? 1 : local;
+        var off = (s.len * (1 - local)).toFixed(2);
+        s.glow.style.strokeDashoffset = off;
+        s.line.style.strokeDashoffset = off;
+      });
+      startDot.setAttribute('opacity', p > 0.008 ? 1 : 0);
+      if (p >= 0.999) tail.classList.add('is-on');
+      else tail.classList.remove('is-on');
+    }
+    setProgress(0);
 
     var readout = document.createElement('div');
     readout.className = 'chart-readout';
@@ -210,7 +262,12 @@
     hit.addEventListener('pointerdown', function (e) { showAt(e.clientX); });
     hit.addEventListener('pointerleave', hide);
 
-    return true;
+    return {
+      setProgress: setProgress,
+      finish: function () { setProgress(1); },
+      reset: function () { setProgress(0); },
+      length: totalLen
+    };
   }
 
   GPM.chart = { render: render, tickValues: tickValues };
