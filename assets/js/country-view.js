@@ -20,18 +20,9 @@
     return v.toFixed(1);
   }
 
-  /* 大数字这一块只说“起点 → 今天”这一件事，不再重复读数：数字本身已经是读数 */
+  /* 大数字这一块只说“起点 → 今天”这一件事：数字本身已经是读数，不再补解释句 */
   function heroCopy(key) {
-    if (key === 'u5mr') {
-      return {
-        unit: '‰',
-        cap: '每 1000 个活产儿里，有多少没能活过五岁。'
-      };
-    }
-    return {
-      unit: '岁',
-      cap: '出生时预期寿命，一个人平均能活多少年。'
-    };
+    return { unit: key === 'u5mr' ? '‰' : '岁' };
   }
 
   function domainFor(series, key) {
@@ -129,20 +120,29 @@
     var improved = heroKey === 'u5mr' ? lastVal < baseVal : lastVal > baseVal;
     var trend = improved ? 'up' : 'down';
 
-    /* ---------- 文案 ---------- */
+    /* ---------- 文案：叙事页不留解释句，只剩 HUD 标题 ---------- */
     var nameZh = esc(c.nameZh);
-    var cap1 = '这条线上的每一个点，都是一年真实观测。没有估算，也没有插值。';
-    var cap2 = heroKey === 'u5mr'
-      ? '上面那条往下走，下面那条往上走。它们是同一件事的两面：孩子活下来了，人也就活得更久。'
-      : '上面那条往下走，下面那条往上走。死亡在退，寿命在长——同一件事的两面。';
-    var cap3 = '把' + nameZh + '放回世界的坐标里：横轴人均收入，纵轴预期寿命，每个气泡是一个国家。'
-      + '按下播放，看这一整片气泡怎么挪。';
+    var bubbleTitle = '全球各国：收入与寿命的变迁';
 
     /* ---------- 结构 ---------- */
     var chartsHTML = function (suffix) {
       return (c.u5mr ? chartBlock('u5mr', indU, c.u5mr, suffix) : '')
         + (c.lifeExp ? chartBlock('lifeExp', indL, c.lifeExp, suffix) : '');
     };
+
+    /* 没有气泡数据的国家（42 个）不铺这一屏，整体高度也跟着少一屏 */
+    var bubbleHTML = hasBubble
+      ? '    <div class="st-layer st-bubble">'
+      + '      <div class="st-inner">'
+      + '        <p class="st-hud-title"><i aria-hidden="true">[</i><span>' + bubbleTitle + '</span>'
+      + '          <i aria-hidden="true">]</i></p>'
+      + '        <div class="bub-root" id="bubRoot"></div>'
+      + '      </div>'
+      + '    </div>'
+      : '';
+    var stepsHTML = '<div class="st-step" data-step="0" aria-hidden="true"></div>'
+      + '<div class="st-step" data-step="1" aria-hidden="true"></div>'
+      + (hasBubble ? '<div class="st-step" data-step="2" aria-hidden="true"></div>' : '');
 
     mount.innerHTML = ''
       + '<section class="story" id="story" data-state="0" data-trend="' + trend + '">'
@@ -180,24 +180,15 @@
       + '              <i class="st-unit">' + copy.unit + '</i></div>'
       + '          </div>'
       + '        </div>'
-      + '        <p class="st-line">' + copy.cap + '</p>'
       + '        <p class="st-hint" aria-hidden="true">向下滚动<span class="st-chev">↓</span></p>'
       + '      </div>'
       + '    </div>'
       + '    <div class="st-layer st-charts">'
       + '      <div class="st-inner">' + chartsHTML('side') + '</div>'
       + '    </div>'
-      + '    <div class="st-layer st-bubble">'
-      + '      <div class="st-inner"><div class="bub-root" id="bubRoot"></div></div>'
-      + '    </div>'
+      + bubbleHTML
       + '  </div>'
-      + '  <div class="story-steps">'
-      + '    <div class="st-step" data-step="0" aria-hidden="true"></div>'
-      + '    <div class="st-step" data-step="1"><p class="st-cap">' + cap1 + '</p></div>'
-      + '    <div class="st-step" data-step="2"><p class="st-cap">' + cap3 + '</p></div>'
-      + '    <div class="st-step" data-step="3" aria-hidden="true"></div>'
-      + '    <div class="st-step" data-step="4" aria-hidden="true"></div>'
-      + '  </div>'
+      + '  <div class="story-steps">' + stepsHTML + '</div>'
       + '</section>'
       + '<section class="story-tail">'
       + '  <div class="story-tail-in">'
@@ -364,6 +355,9 @@
 
     function applyState(s) {
       if (s === curState) return;
+      /* 回到第 1 屏才重置：吸附回弹时页面只回到接近顶部的位置，
+         不能让「刚起步就被拉回 0」把数字与折线又清一次 */
+      if (s === 0 && window.scrollY > 24) return;
       var prev = curState;
       curState = s;
       story.dataset.state = String(s);

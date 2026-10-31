@@ -640,7 +640,8 @@ body[data-view="country"] .hud-rail { display: none; }
 .st-num .st-inner {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  padding: 9vh 6vw 13vh;
+  /* 上下留白对称：数字块自己就落在视口 50%，不再靠 translate 补偿 */
+  padding: 11vh 6vw;
   text-align: center;
   transform-origin: 50% 50%;
   transition: transform 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -782,20 +783,12 @@ body[data-view="country"] .hud-rail { display: none; }
 }
 .is-settled .st-from { opacity: 0.66; }
 
-.st-line {
-  position: relative;
-  margin: 30px 0 0; max-width: 25em;
-  font-size: clamp(16px, 1.42vw, 20px);
-  line-height: 1.72;
-  color: var(--ink-2); letter-spacing: 0.01em;
-  text-wrap: pretty;
-  transition: opacity 420ms ease-out;
-}
-
 .is-settled .st-chart-delta { opacity: 1; }
 
 .st-hint {
-  margin: 52px 0 0;
+  /* 脱离文档流：它的显隐不参与数字块的垂直居中计算 */
+  position: absolute; left: 0; right: 0; bottom: 9vh;
+  margin: 0;
   font-family: var(--mono); font-size: 12px;
   letter-spacing: 0.26em; color: #94A3B8;
   transition: opacity 380ms ease-out;
@@ -834,11 +827,29 @@ body[data-view="country"] .hud-rail { display: none; }
 
 /* 气泡图 */
 .st-bubble .st-inner {
-  padding: 9vh 5vw 30vh;
+  padding: 11vh 5vw 11vh;
   display: flex; flex-direction: column;
+  gap: 14px;
   transform-origin: 50% 50%;
   transition: transform 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
+/* 极简 HUD 标题：只有括号 + 一行字，剩下的交给图 */
+.st-hud-title {
+  margin: 0; flex: none;
+  display: flex; align-items: baseline; gap: 9px;
+  font-family: var(--mono);
+  font-size: clamp(14px, 1.15vw, 17px);
+  letter-spacing: 0.14em;
+  color: #D6F7FF;
+  text-shadow: 0 0 20px rgba(34, 211, 238, 0.5);
+}
+.st-hud-title i {
+  font-style: normal; font-size: 1.15em; font-weight: 400;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.85);
+}
+.st-hud-title i:first-child { margin-right: -2px; }
+.st-hud-title i:last-child { margin-left: -2px; }
 
 /* ---------- 状态切换 ---------- */
 /* 0：只有大数字 */
@@ -847,12 +858,8 @@ body[data-view="country"] .hud-rail { display: none; }
 
 /* 1：数字缩到左侧，折线在右边一栏淡入。两栏共用一条水平中心线 */
 .story[data-state="1"] .st-num { opacity: 1; }
-/* 下面那句说明与“向下滚动”此时已淡出，但仍在文档流里占位，
-   68px 是把这段占位折回来的补偿量，让数字块正中对齐 50% */
-.story[data-state="1"] .st-num .st-inner { transform: translate(-25vw, calc(2vh + 85px)); }
+.story[data-state="1"] .st-num .st-inner { transform: translate(-25vw, 0); }
 .story[data-state="1"] .st-charts { opacity: 1; pointer-events: auto; }
-/* 第 2 屏的说明交给旁白与图表标题，这里腾出空间给上下居中对齐 */
-.story[data-state="1"] .st-line { opacity: 0; }
 
 /* 吸附：每滑一次正好停在一屏，画布不会停在两张之间 */
 html.snap-story { scroll-snap-type: y proximity; }
@@ -864,26 +871,21 @@ html.snap-story .story-tail { scroll-snap-align: start; }
 
 .story:not([data-state="0"]) .st-hint { opacity: 0; }
 
-/* ---------- 步进文字 ---------- */
+/* ---------- 步进：三屏，一屏一段 ---------- */
 .story-steps {
   position: relative;
   margin-top: -100vh;
   pointer-events: none;
 }
-.st-step { height: 100vh; position: relative; }
-.st-cap {
-  position: absolute; left: 6vw; bottom: 7.5vh;
-  margin: 0; max-width: 21em;
-  font-size: clamp(16px, 1.15vw, 18px);
-  line-height: 1.85;
-  text-wrap: pretty;
-  color: var(--ink-2);
-  text-shadow: 0 2px 28px rgba(2, 6, 23, 0.95);
-  pointer-events: auto;
-}
+/* 段落只负责「滚动多长」，不再承载文字。
+   总高 260vh（原来是 5×100vh）：落地 → 半屏就进双栏动画 → 再一滑看气泡图 */
+.st-step { position: relative; }
+.st-step[data-step="0"] { height: 70vh; }
+.st-step[data-step="1"] { height: 70vh; }
+.st-step[data-step="2"] { height: 120vh; }
 
 /* ---------- 气泡图组件 ---------- */
-.bub-root { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.bub-root { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; }
 .bub-plot { position: relative; flex: 1 1 auto; min-height: 0; }
 .bub-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .bub-plot text { font-family: var(--mono); }
@@ -1056,15 +1058,16 @@ html.snap-story .story-tail { scroll-snap-align: start; }
 
 /* ---------- 详情页响应式 ---------- */
 @media (max-width: 1080px) {
-  /* 左右分栏放不下：上下分。数字在上，折线在下。
-     上半屏只有半屏高，所以起点/终点这一列整体收一档，说明句让位给图表。 */
-  .story[data-state="1"] .st-num .st-inner { transform: translate(0, -16vh); }
+  /* 左右分栏放不下：上下分。数字钉在上半屏顶部，折线从下面接上，
+     不用 translate 硬挪（挪多了会顶到导航，挪少了会压住折线） */
+  .story[data-state="1"] .st-num .st-inner {
+    transform: none;
+    justify-content: flex-start;
+    padding: 10vh 6vw 0;
+  }
   .story[data-state="1"] .st-big { font-size: clamp(46px, 6.4vw, 92px); }
   .story[data-state="1"] .st-from-v { font-size: 25px; }
-  .st-line { max-width: 30em; }
-  .st-charts .st-inner { padding: 35vh 6vw 19vh; gap: 18px; }
-  /* 全宽折线图的横轴会一直铺到左边，旁白要往下让 */
-  .st-cap { bottom: 3vh; }
+  .st-charts .st-inner { padding: 38vh 6vw 12vh; gap: 18px; }
 }
 
 @media (max-width: 720px) {
@@ -1080,19 +1083,15 @@ html.snap-story .story-tail { scroll-snap-align: start; }
   .st-drop { margin: 6px 0 0; }
   .st-tick b { font-size: 13.5px; letter-spacing: 0.12em; }
   .st-tick-now { font-size: 11.5px; padding: 2px 8px 1px; margin-left: 8px; }
-  .st-line { margin-top: 22px; font-size: 15.5px; line-height: 1.62; padding: 0 2vw; }
-  .st-hint { margin-top: 34px; }
-  .st-num .st-inner { padding: 6vh 5vw 16vh; }
-  .story[data-state="1"] .st-num .st-inner { transform: translate(0, -19vh); }
-  .st-charts .st-inner { padding: 30vh 5vw 21vh; gap: 14px; }
+  .st-hint { bottom: 7vh; }
+  .st-num .st-inner { padding: 9vh 5vw; }
+  .story[data-state="1"] .st-num .st-inner { transform: none; padding: 9vh 5vw 0; }
+  .st-charts .st-inner { padding: 36vh 5vw 8vh; gap: 14px; }
   .st-chart-name { font-size: 15px; }
   .st-chart-name em { font-size: 11px; margin-left: 5px; }
   .st-chart-delta { font-size: 16px; }
-  .st-cap {
-    left: 5vw; right: 5vw; bottom: 9vh;
-    max-width: none; font-size: 15px; line-height: 1.8;
-  }
-  .st-bubble .st-inner { padding: 7vh 4vw 34vh; }
+  .st-bubble .st-inner { padding: 9vh 4vw 8vh; gap: 12px; }
+  .st-hud-title { font-size: 13.5px; letter-spacing: 0.08em; gap: 6px; }
   .bub-legend { gap: 5px 12px; font-size: 11px; }
   .bub-legend .bub-legend-size { display: none; }
   .bub-year b { font-size: 20px; }
