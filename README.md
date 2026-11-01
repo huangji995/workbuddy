@@ -39,7 +39,7 @@ npx serve .        # 或 python -m http.server 8080
 - **时间轴**：播放/暂停（空格键也行），或直接拖到任意年份；播完停在 2024，稍候自动淡出重播
 - 顶部三张 KPI 卡（中位数 / 高于高位的国家数 / 低于低位的国家数）随年份与指标实时重算
 - **开场启动日志**：深空底上逐行打字（含「灵感与数据来源：汉斯·罗斯林《事实》」），点击或任意按键跳过
-- **开场直觉测试**：启动日志之后弹 3 道单选题，题目数值由数据实时计算；右上角 `[ Skip >> ]` 或 Esc 可跳过
+- **开场直觉测试**：启动日志之后弹《事实》原书 5 道单选题（选项每次打乱，答错会点出对应的思维本能）；右上角 `[ Skip >> ]` 或 Esc 可跳过
 
 ### 开场测试怎么重看
 
@@ -56,7 +56,7 @@ assets/js/globe.js            3D 地球渲染器（d3.geoOrthographic + Canvas 2
 assets/js/map-view.js         首页：指标胶囊、时间轴状态机、KPI、图例、搜索、榜单
 assets/js/metrics.js          全局指标表（label/单位/色阶锚点/betterWhen）+ 选中的指标状态
 assets/js/boot.js             开场启动日志（打字机，一次会话一次）
-assets/js/calibration.js      开场直觉测试层（3 题 + 结算，独立于地球渲染）
+assets/js/calibration.js      开场直觉测试层（《事实》5 题固定题库 + 结算，独立于地球渲染）
 assets/js/country-view.js     详情页：双屏滚动舞台、两套指标控件、数字+折线、气泡图
 assets/js/bubble.js          Gapminder 气泡图（对数横轴、气泡面积=人口、逐年回放）
 assets/js/chart.js            手写 SVG 折线图（缺失年份断线、逐点绘制）

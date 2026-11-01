@@ -1,10 +1,10 @@
-/* 开场直觉测试：全屏 HUD 覆盖层，3 道题全部由 data.js 实时计算得出 */
+/* 开场直觉测试：全屏 HUD 覆盖层，题库为《事实》原书 5 题（固定答案，仅打乱选项顺序） */
 (function () {
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
 
   var SESSION_KEY = 'gpm.calib.done';
-  var ADVANCE_MS = 1500;   // 答题反馈停留时间，之后自动进入下一题
+  var ADVANCE_MS = 1900;   // 答题反馈停留时间，之后自动进入下一题
   var FADE_MS = 420;
   var OPEN_DELAY = 700;    // 等地球首帧落定，避免盖住一张空白画布
 
@@ -12,17 +12,6 @@
     return String(s).replace(/[&<>"]/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
-  }
-
-  function median(list) {
-    var a = list.slice().sort(function (x, y) { return x - y; });
-    var n = a.length;
-    if (!n) return 0;
-    return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
-  }
-
-  function round5(v) {
-    return Math.round(v / 5) * 5;
   }
 
   function shuffle(list) {
@@ -35,90 +24,80 @@
   }
 
   /**
-   * 把 [数值, 格式化函数, 是否正确] 转成选项，并保证不出现重复数字。
-   * 数值全部由真实数据推导，避免题目与数据脱节。
+   * 题库：汉斯·罗斯林《事实》开篇的 5 道直觉题。
+   * 只有选项顺序在每次打开时打乱，正确项靠 ok 标记跟随，不写死字母。
    */
-  function makeOptions(pairs) {
-    var used = {};
-    return pairs.map(function (p) {
-      var n = p[0], guard = 0;
-      while (used[n] && guard < 12) { n += 5; guard++; }
-      used[n] = true;
-      return { text: p[1](n), ok: !!p[2] };
-    });
-  }
+  var QUESTION_BANK = [
+    {
+      stem: '在过去的 20 年里，全世界生活在极度贫困状态下的人口是如何变化的？',
+      options: [
+        { text: '几乎翻倍' },
+        { text: '保持不变' },
+        { text: '几乎减半', ok: true }
+      ],
+      truth: '几乎减半',
+      right: '[ 校准成功：你避开了“负面思维本能” ]',
+      wrong: '[ 警告：检测到“负面思维本能”干扰，人类往往只关注坏消息 ]'
+    },
+    {
+      stem: '全世界人口的预期寿命现在是多少岁？',
+      options: [
+        { text: '50 岁' },
+        { text: '60 岁' },
+        { text: '70 岁', ok: true }
+      ],
+      truth: '70 岁',
+      right: '[ 校准成功：你掌握了真实的人口健康状况 ]',
+      wrong: '[ 警告：人类总是低估全球健康水平的进步 ]'
+    },
+    {
+      stem: '现在全世界有多少一岁儿童接种过疫苗？',
+      options: [
+        { text: '20%' },
+        { text: '50%' },
+        { text: '80%', ok: true }
+      ],
+      truth: '80%',
+      right: '[ 校准成功：你看到了全球卫生的普及 ]',
+      wrong: '[ 警告：人类往往低估现代医疗的覆盖率 ]'
+    },
+    {
+      stem: '在全世界范围内，30 岁的男人平均接受教育的时间超过 10 年。' +
+        '请问 30 岁的女性，平均在学校接受教育的时间是多少年？',
+      options: [
+        { text: '9 年', ok: true },
+        { text: '6 年' },
+        { text: '3 年' }
+      ],
+      truth: '9 年',
+      right: '[ 校准成功：你避开了“单一视角本能”，看到了全球性别平等的进步 ]',
+      wrong: '[ 警告：检测到“单一视角本能”，全球女性的受教育程度已大幅提升 ]'
+    },
+    {
+      stem: '全世界有多少人能够使用电？',
+      options: [
+        { text: '20%' },
+        { text: '50%' },
+        { text: '80%', ok: true }
+      ],
+      truth: '80%',
+      right: '[ 校准成功：你避开了“恐惧本能” ]',
+      wrong: '[ 警告：黑暗正在消退，但你的直觉还没跟上 ]'
+    }
+  ];
 
   function buildQuestions() {
-    var D = window.__GPM_DATA__;
-    var all = Object.keys(D.countries).map(function (k) { return D.countries[k]; });
-
-    var u = all.filter(function (c) {
-      return c.u5mr && c.u5mr.base && c.u5mr.last &&
-        c.u5mr.deltaPct !== null && c.u5mr.delta !== null &&
-        c.u5mr.base.value !== null && c.u5mr.last.value !== null;
+    return QUESTION_BANK.map(function (q) {
+      return {
+        stem: q.stem,
+        options: shuffle(q.options).map(function (o) {
+          return { text: o.text, ok: !!o.ok };
+        }),
+        truth: q.truth,
+        right: q.right,
+        wrong: q.wrong
+      };
     });
-    var l = all.filter(function (c) {
-      return c.lifeExp && c.lifeExp.base && c.lifeExp.last && c.lifeExp.delta !== null;
-    });
-
-    var medPct = median(u.map(function (c) { return Math.abs(c.u5mr.deltaPct); }));
-    var fell = u.filter(function (c) { return c.u5mr.delta < 0; }).length;
-    var under10 = u.filter(function (c) { return c.u5mr.last.value < 10; }).length;
-    var under10Base = u.filter(function (c) { return c.u5mr.base.value < 10; }).length;
-    var share = u.length ? under10 / u.length * 100 : 0;
-    var shareBase = u.length ? under10Base / u.length * 100 : 0;
-    var medYears = median(l.map(function (c) { return c.lifeExp.delta; }));
-    var gain15 = l.filter(function (c) { return c.lifeExp.delta > 15; }).length;
-
-    var q1 = Math.round(medPct);
-    var q2 = Math.round(share);
-    var q3 = Math.round(medYears);
-
-    var pctLabel = function (n) { return '下降约 ' + n + '%'; };
-    var yearLabel = function (n) { return '约 ' + n + ' 年'; };
-    var shareLabel = function (n) { return '约 ' + n + '%'; };
-
-    return [
-      {
-        stem: '从 1990 年到最新可得年份，中位数国家的 5 岁以下儿童死亡率变化了多少？',
-        hint: '中位数 = 把 ' + u.length + ' 个国家按变化幅度排队，站在正中间的那个。',
-        options: shuffle(makeOptions([
-          [0, function () { return '基本没变'; }, false],
-          [round5(q1 * 0.3), pctLabel, false],
-          [q1, pctLabel, true],
-          [round5(Math.min(97, q1 * 1.38)), pctLabel, false]
-        ])),
-        truthLabel: pctLabel(q1),
-        verify: '实测：中位数降幅 ' + medPct.toFixed(1) + '%，' +
-          u.length + ' 个国家里有 ' + fell + ' 个在下降。'
-      },
-      {
-        stem: '如今，这 ' + u.length + ' 个有数据的国家里，5 岁以下儿童死亡率已低于 10‰ 的约占多少？',
-        hint: '10‰ 意味着每 1000 个活产儿里有不到 10 个活不过 5 岁。',
-        options: shuffle(makeOptions([
-          [Math.round(q2 * 0.25), shareLabel, false],
-          [Math.round(q2 * 0.65), shareLabel, false],
-          [q2, shareLabel, true],
-          [Math.round(Math.min(85, q2 * 1.55)), shareLabel, false]
-        ])),
-        truthLabel: shareLabel(q2),
-        verify: '实测：' + under10 + ' / ' + u.length + ' = ' + share.toFixed(1) +
-          '%；1990 年这个比例只有 ' + shareBase.toFixed(1) + '%。'
-      },
-      {
-        stem: '同一时期，中位数国家的出生时预期寿命增加了多少？',
-        hint: '口径：各国从 1990 年到各自最新可得年份，取所有国家的中位数。',
-        options: shuffle(makeOptions([
-          [Math.round(q3 * 0.15), yearLabel, false],
-          [Math.round(q3 * 0.5), yearLabel, false],
-          [q3, yearLabel, true],
-          [Math.round(Math.min(30, q3 * 1.9)), yearLabel, false]
-        ])),
-        truthLabel: yearLabel(q3),
-        verify: '实测：中位数 +' + medYears.toFixed(1) + ' 年，' +
-          l.length + ' 个地区里有 ' + gain15 + ' 个增加超过 15 年。'
-      }
-    ];
   }
 
   /* ---------------- 覆盖层 ---------------- */
@@ -150,7 +129,6 @@
     var pct = ((idx + 1) / state.questions.length) * 100;
     return '<p class="calib-step">QUESTION ' + pad2(idx + 1) + ' / ' + pad2(state.questions.length) + '</p>'
       + '<h2 class="calib-stem" id="calibStem">' + esc(q.stem) + '</h2>'
-      + '<p class="calib-hint">' + esc(q.hint) + '</p>'
       + '<div class="calib-opts" id="calibOpts">' + q.options.map(optionHTML).join('') + '</div>'
       + '<p class="calib-feedback" id="calibFeedback" role="status" aria-live="polite"></p>'
       + '<div class="calib-progress"><i style="width:' + pct.toFixed(1) + '%"></i></div>';
@@ -165,18 +143,17 @@
         + '<span class="calib-recap-idx">' + pad2(i + 1) + '</span>'
         + '<span class="calib-recap-mark ' + (ok ? 'yes' : 'no') + '">' + (ok ? '✓' : '✗') + '</span>'
         + '<span class="calib-recap-body">' + (ok
-          ? esc(q.truthLabel)
-          : '你选 ' + esc(q.options[a].text) + ' · 实为 ' + esc(q.truthLabel))
+          ? esc(q.truth)
+          : '你选 ' + esc(q.options[a].text) + ' · 实为 ' + esc(q.truth))
         + '</span></li>';
     }).join('');
 
     return '<p class="calib-step">CALIBRATION COMPLETE</p>'
       + '<div class="calib-score"><b>' + state.score + '</b><span>/ ' + total + '</span></div>'
       + '<p class="calib-verdict">你的认知准确度：' + state.score + ' / ' + total + '</p>'
-      + '<p class="calib-line">大多数人的直觉比随机瞎猜还差，这个世界比你想象的要好。</p>'
       + '<ul class="calib-recap">' + rows + '</ul>'
       + '<p class="calib-invite">这个世界，比你想象的要好。来看看真实的数据。</p>'
-      + '<button class="calib-cta" id="calibCta" type="button">[ 进入真实数据 -&gt; ]</button>';
+      + '<button class="calib-cta" id="calibCta" type="button">[ 进入真实数据地球 -&gt; ]</button>';
   }
 
   function pad2(n) {
@@ -233,8 +210,7 @@
     }
 
     var fb = node.querySelector('#calibFeedback');
-    var verdict = q.options[pick].ok ? '命中。' : '偏了。';
-    fb.textContent = '// ' + verdict + ' ' + q.verify;
+    fb.textContent = q.options[pick].ok ? q.right : q.wrong;
     fb.classList.add(q.options[pick].ok ? 'is-ok' : 'is-no');
 
     timer = setTimeout(function () {

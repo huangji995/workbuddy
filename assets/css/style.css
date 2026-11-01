@@ -944,24 +944,23 @@ body[data-view="country"] .hud-rail { display: none; }
   border-top: 9px solid #7FE6F8;
   filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.8));
 }
-/* 光点：从线的顶端一路滑到尖端（top 100%），停住 → 涨开 → 消散 */
+/* 光点：从线的顶端一路滑到尖端（top 100%），到位后只是渐渐消散，不再放大 */
 .st-arrow-orb {
   position: absolute; left: 50%; top: 0;
-  width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 50%,
-    #FFFFFF 0%, #A5F3FC 40%, rgba(34, 211, 238, 0) 72%);
-  box-shadow: 0 0 10px 2px rgba(34, 211, 238, 0.7);
+    #FFFFFF 0%, #A5F3FC 42%, rgba(34, 211, 238, 0) 74%);
+  box-shadow: 0 0 6px 1px rgba(34, 211, 238, 0.55);
   animation: stOrbDrop 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 @keyframes stOrbDrop {
-  0%   { top: 0;    opacity: 0;    transform: scale(0.55); }
-  10%  { opacity: 1;               transform: scale(1); }
-  60%  { top: 100%; opacity: 1;    transform: scale(1); }
-  /* 停在尖端：能量注入，涨开一圈再散掉 */
-  72%  { top: 100%; opacity: 0.9;  transform: scale(2.1); }
-  86%  { top: 100%; opacity: 0;    transform: scale(2.7); }
-  100% { top: 100%; opacity: 0;    transform: scale(0.55); }
+  0%   { top: 0;    opacity: 0;    transform: scale(0.7); }
+  12%  { opacity: 1;               transform: scale(1); }
+  62%  { top: 100%; opacity: 1;    transform: scale(1); }
+  /* 停在尖端：能量注入完成，光点原地淡掉，尺寸始终不放大 */
+  82%  { top: 100%; opacity: 0.42; transform: scale(1); }
+  100% { top: 100%; opacity: 0;    transform: scale(1); }
 }
 /* 数字跳动那 2.1 秒里，光点加速注入，线也更亮 */
 .is-rolling .st-arrow-orb { animation-duration: 0.9s; }
@@ -1550,22 +1549,14 @@ body.calib-open { overflow: hidden; }
   color: var(--hud-label);
 }
 .calib-stem {
-  margin: 0 0 10px;
+  margin: 0 0 22px;
   font-family: var(--font);
   font-size: clamp(20px, 4.4vw, 25px);
   font-weight: 600;
   line-height: 1.5;
   letter-spacing: -0.01em;
   color: var(--hud-ink);
-  max-width: 30ch;
-}
-.calib-hint {
-  margin: 0 0 22px;
-  max-width: 44ch;
-  font-family: var(--hud-mono);
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--hud-ink-2);
+  max-width: 34ch;
 }
 
 /* ---------- 选项 ---------- */
@@ -1642,17 +1633,26 @@ body.calib-open { overflow: hidden; }
   50% { box-shadow: 0 0 28px rgba(239, 68, 68, 0.62), inset 0 0 28px rgba(239, 68, 68, 0.22); }
 }
 
-/* ---------- 判题反馈 ---------- */
+/* ---------- 判题反馈：等宽小字，答完才浮现 ---------- */
 .calib-feedback {
-  min-height: 40px;
+  min-height: 44px;
   margin: 14px 0 0;
   font-family: var(--hud-mono);
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 12.5px;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
   color: #7DD3FC;
+}
+.calib-feedback.is-ok,
+.calib-feedback.is-no {
+  animation: calibFbIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .calib-feedback.is-ok { color: #86EFAC; }
 .calib-feedback.is-no { color: #FCA5A5; }
+@keyframes calibFbIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
 
 /* ---------- 进度条：渐变 + 发光扫描 ---------- */
 .calib-progress {
