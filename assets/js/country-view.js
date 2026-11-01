@@ -165,29 +165,28 @@
       + '        <div class="tabs" role="tablist" aria-label="切换指标" id="tabs">' + tabsHTML + '</div>'
       + '      </div>'
 
-      /* 数字层：从正中缩到左栏。单值结构：年份 + 巨大数字 + 发光下落箭头，
-         起点状态就是「1990 年 / 25.0」，滚动后同一位数字跳到「2024 今天 / 59.0」 */
+      /* 数字层：一个 flex 纵列，四块从上到下永远同时在（标题 / 起点 / 箭头 / 动态数字）。
+         整列只做一次 transform：p=0 居中，p=1 平移到左侧。
+         绝不用 position:absolute 分别摆起点和终点 —— 那正是「起点消失、箭头悬空」的根源。 */
       + '      <div class="pin-num" id="numStage">'
       + '        <div class="num-in">'
-      + '          <p class="hero-tag"><b>[ ' + nameZh + ' ]</b><span id="heroInd"></span></p>'
-      + '          <div class="st-hero">'
-      + '            <p class="st-tick"><b id="stYear">—</b><em>年</em>'
-      + '              <span class="st-tick-now" id="stNow" hidden>今天</span></p>'
-      + '            <div class="st-big"><b id="stBig">—</b><i class="st-unit" id="stUnit"></i></div>'
-      + '            <span class="st-drop" aria-hidden="true">'
-      + '              <svg class="st-drop-svg" width="18" height="60" viewBox="0 0 18 60" fill="none">'
-      + '                <defs>'
-      + '                  <linearGradient id="stDropGrad" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">'
-      + '                    <stop offset="0" stop-color="#22D3EE" stop-opacity="0.06"/>'
-      + '                    <stop offset="1" stop-color="#22D3EE" stop-opacity="1"/>'
-      + '                  </linearGradient>'
-      + '                </defs>'
-      + '                <path d="M9 0V52" stroke="#22D3EE" stroke-width="3" stroke-opacity="0.14" stroke-linecap="round"/>'
-      + '                <path class="st-flow" d="M9 0V52" stroke="url(#stDropGrad)" stroke-width="2" stroke-linecap="round"/>'
-      + '                <path d="M4.6 46.8 9 52.6l4.4-5.8" stroke="url(#stDropGrad)" stroke-width="2"'
-      + '                  stroke-linecap="round" stroke-linejoin="round"/>'
-      + '              </svg>'
-      + '            </span>'
+      + '          <div class="st-stack" id="stStack">'
+      /* ① 标题块 */
+      + '            <p class="st-head"><b>[ ' + nameZh + ' ]</b><span id="heroInd"></span></p>'
+      /* ② 起点块：动画中永远存在，绝不会被隐藏或删除 */
+      + '            <p class="st-from">'
+      + '              <em class="st-from-tag">起点</em>'
+      + '              <span class="st-from-k"><b id="fromYear">1990</b> 年</span>'
+      + '              <span class="st-from-v"><b id="fromVal">—</b><i id="fromUnit"></i></span>'
+      + '            </p>'
+      /* ③ 连贯箭头：一根 2px 竖线 + 底部小三角，上下都贴着相邻块，不悬空 */
+      + '            <div class="st-arrow" aria-hidden="true"><i></i></div>'
+      /* ④ 动态数字块：年份（今天）+ 巨大数字 */
+      + '            <div class="st-now">'
+      + '              <p class="st-tick"><b id="stYear">1990</b><em>年</em>'
+      + '                <span class="st-tick-now" id="stNow">今天</span></p>'
+      + '              <p class="st-big"><b id="stBig">—</b><i class="st-unit" id="stUnit"></i></p>'
+      + '            </div>'
       + '          </div>'
       + '        </div>'
       + '      </div>'
@@ -248,6 +247,9 @@
     var unitEl = mount.querySelector('#stUnit');
     var indEl = mount.querySelector('#heroInd');
     var nowEl = mount.querySelector('#stNow');
+    var fromYearEl = mount.querySelector('#fromYear');
+    var fromValEl = mount.querySelector('#fromVal');
+    var fromUnitEl = mount.querySelector('#fromUnit');
     var titleEl = mount.querySelector('#chartTitle');
     var subEl = mount.querySelector('#chartSub');
     var deltaEl = mount.querySelector('#chartDelta');
@@ -262,7 +264,7 @@
     var swapToken = 0;
     var menuOpen = false;
     var animated = 'idle';        // idle | playing | settled
-    var animRaf = null;
+    var tl = null;                // 当前 GSAP timeline（或退化的 rAF 句柄）
     var geom = 0;                 // --p 的当前值，只由动画写
     var heroMode = true;
 
@@ -290,9 +292,58 @@
       }
     }
 
-    function stopAnim() {
-      if (animRaf) { cancelAnimationFrame(animRaf); animRaf = null; }
+    /* ---------- 时间轴：几何与数字挂在同一条 timeline 上 ----------
+       所有 tween 都从 0 秒起跑、共用同一个 duration，
+       所以在任何一帧里「排版走了多少」和「数字跳了多少」都是同一时刻的进度，
+       不存在「先播完数字再变形」或「变形走到一半数字才动」。
+       首选 GSAP Timeline；万一 vendor 里的 gsap 没加载成功，退化成一个 rAF 补间，
+       页面也不会卡在第一屏。 */
+    function easeToFn(e) {
+      if (typeof e === 'function') return e;
+      if (e === 'power2.out') return easeOut;
+      if (e === 'power2.inOut') return easeIO;
+      return function (t) { return t; };
     }
+
+    function timeline(durSec, tweens, onDone) {
+      if (window.gsap) {
+        var t = window.gsap.timeline({ onComplete: onDone });
+        tweens.forEach(function (tw) {
+          var vars = { duration: durSec, ease: tw.ease, onUpdate: tw.onUpdate };
+          for (var k in tw.to) if (Object.prototype.hasOwnProperty.call(tw.to, k)) vars[k] = tw.to[k];
+          t.to(tw.obj, vars, 0);       // 位置参数 0：全部同时开始
+        });
+        return t;
+      }
+      /* 退化路径：同一个循环推进所有 tween */
+      var raf = null, t0 = 0, alive = true;
+      var from = tweens.map(function (tw) {
+        var f = {};
+        for (var k in tw.to) if (Object.prototype.hasOwnProperty.call(tw.to, k)) f[k] = tw.obj[k];
+        return f;
+      });
+      function step(ts) {
+        if (!alive) return;
+        if (!t0) t0 = ts;
+        var t = Math.min(1, (ts - t0) / (durSec * 1000));
+        tweens.forEach(function (tw, i) {
+          var e = easeToFn(tw.ease)(t);
+          for (var k in tw.to) {
+            if (!Object.prototype.hasOwnProperty.call(tw.to, k)) continue;
+            tw.obj[k] = from[i][k] + (tw.to[k] - from[i][k]) * e;
+          }
+          if (tw.onUpdate) tw.onUpdate();
+        });
+        if (t < 1) raf = requestAnimationFrame(step);
+        else { raf = null; if (onDone) onDone(); }
+      }
+      raf = requestAnimationFrame(step);
+      return {
+        kill: function () { alive = false; if (raf) { cancelAnimationFrame(raf); raf = null; } }
+      };
+    }
+
+    function stopAnim() { if (tl) { tl.kill(); tl = null; } }
 
     /* 定格：数字落到最新一年，亮起「今天 / 最新」，几何收在 geoTo */
     function finish(geoTo) {
@@ -306,7 +357,7 @@
       nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
     }
 
-    /* 触发：一条 2.5 秒的时间轴，同时推进数值与几何，滚轮停在哪里都自己播完 */
+    /* 触发：固定 2.5 秒。滚轮只负责「叫醒它」，之后停在哪里都不打断、不反向。 */
     function play(geoTo) {
       stopAnim();
       if (DECOR) { finish(geoTo); return; }
@@ -315,22 +366,24 @@
       story.classList.add('is-rolling');
       nowEl.hidden = true;
       paintAt(0);
-      var gFrom = geom;
-      var t0 = 0;
-      function step(ts) {
-        if (!t0) t0 = ts;
-        var t = Math.min(1, (ts - t0) / ANIM_DUR);
-        /* 同一个 t、同一条时间轴：动作 A 与动作 B 同时开始、同时结束 */
-        paintAt(easeOut(t));
-        paintGeo(gFrom + (geoTo - gFrom) * easeGeo(t));
-        if (t < 1) {
-          animRaf = requestAnimationFrame(step);
-        } else {
-          animRaf = null;
-          finish(geoTo);
+      var o = { v: 0, p: geom };
+      tl = timeline(ANIM_DUR / 1000, [
+        /* 动作 A：数字与年份 1990 → 2024，折线笔尖同步 */
+        {
+          obj: o, to: { v: 1 }, ease: 'power2.out',
+          onUpdate: function () { paintAt(o.v); }
+        },
+        /* 动作 B：--p 同步推到底 —— 整列平移缩小的 CSS 全挂在这个值上。
+           缓动用「easeOut 与 easeInOut 的中点」：开头跟得上数字的冲刺，
+           结尾又收得住，不会比数字慢半拍。 */
+        {
+          obj: o, to: { p: geoTo }, ease: easeGeo,
+          onUpdate: function () { paintGeo(o.p); }
         }
-      }
-      animRaf = requestAnimationFrame(step);
+      ], function () {
+        tl = null;
+        finish(geoTo);
+      });
     }
 
     /* 重置：平滑退回第一屏（数字回起点、折线清空），等待下一次触发 */
@@ -348,23 +401,16 @@
         syncScroll();          // 重置期间又滚下去了就补一次触发
         return;
       }
-      var t0 = 0;
-      function step(ts) {
-        if (!t0) t0 = ts;
-        var t = Math.min(1, (ts - t0) / RESET_DUR);
-        var e = 1 - easeOut(t);          // 从当前状态退回 0
-        paintAt(pFrom * e);
-        paintGeo(gFrom * e);
-        if (t < 1) {
-          animRaf = requestAnimationFrame(step);
-        } else {
-          animRaf = null;
-          paintAt(0);
-          paintGeo(0);
-          syncScroll();      // 重置期间又滚下去了就补一次触发
-        }
-      }
-      animRaf = requestAnimationFrame(step);
+      var o = { v: pFrom, p: gFrom };
+      tl = timeline(RESET_DUR / 1000, [{
+        obj: o, to: { v: 0, p: 0 }, ease: 'power2.out',
+        onUpdate: function () { paintAt(o.v); paintGeo(o.p); }
+      }], function () {
+        tl = null;
+        paintAt(0);
+        paintGeo(0);
+        syncScroll();          // 重置期间又滚下去了就补一次触发
+      });
     }
 
     /* ---------- 折线 ---------- */
@@ -400,6 +446,11 @@
     function applyMeta() {
       indEl.textContent = ind.label;
       unitEl.textContent = ind.unit;
+      /* 起点块：固定展示基线年与该年的值，动画里它永远不动、不消失 */
+      fromYearEl.textContent = String(m.base.year);
+      fromValEl.textContent = numText(m.base.value, ind.decimals);
+      fromUnitEl.textContent = ind.unit;
+      setYear(m.base.year);
       titleEl.textContent = ind.label;
       subEl.textContent = ind.unitLong;
       var pct = m.deltaPct;
@@ -465,9 +516,17 @@
         drawChart();
         numStage.classList.remove('is-swap');
         chartStage.classList.remove('is-swap');
-        /* 第一屏（几何还在正中）：只重播数字，版式不动；
+        /* 第一屏（几何还在正中）：回到新指标的起点，等下一次滚动再播，
+           绝不停在「居中的 2024 终值」——那会让人以为第一屏已经播完了；
            已经变形到第二屏：直接给新指标的定型态 */
-        if (geom < 0.5) play(0); else finish(1);
+        if (geom < 0.5) {
+          stopAnim();
+          animated = 'idle';
+          paintGeo(0);
+          paintAt(0);
+        } else {
+          finish(1);
+        }
       }, 170);
     }
 

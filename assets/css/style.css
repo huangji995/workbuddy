@@ -658,13 +658,13 @@ body[data-view="country"] .hud-rail { display: none; }
   height: 100vh;
   height: 100svh;
   overflow: hidden;
-  /* 两端几何：p=0 正中巨大数字，p=1 左侧小号数字 */
-  --num-x: -28vw;
+  /* 两端几何：p=0 整列居中，p=1 整列平移到左侧。
+     --stack-fs 是整列的基准字号，--k0 是「居中时额外放大多少倍」，
+     两个数一改，列里四块的标题、起点、箭头、数字全部等比跟着变。 */
+  --num-x: -24vw;
   --num-y: 0vh;
-  --num-w0: 84vw;
-  --num-w1: 34vw;
-  --fs0: clamp(88px, 15vw, 226px);
-  --fs1: clamp(42px, 5.8vw, 94px);
+  --stack-fs: 16px;
+  --k0: 0.62;
 }
 /* 第一屏的那层冷光：滚下去就收掉，别干扰折线 */
 .pin::before {
@@ -822,87 +822,157 @@ body[data-view="country"] .hud-rail { display: none; }
   text-decoration-color: rgba(148, 197, 214, 0.35);
 }
 
-/* ---------- 数字层：从正中缩到左栏 ---------- */
+/* ---------- 左栏：一个 flex 纵列，四块从上到下永远同时在 ----------
+   ① .st-head  标题块  [ 国家 ] — 指标
+   ② .st-from  起点块  1990 年 53.6 ‰（动画中永远不隐藏、不删除）
+   ③ .st-arrow 连贯箭头 2px 青色渐变竖线 + 伪元素小三角，一根到底，不是断开的两截
+   ④ .st-now   动态数字块  年份（今天）+ 巨大数字
+
+   整列只做一次 transform：p=0 居中，p=1 平移左侧。
+   尺寸只认 .st-stack 上的一个字号，内部全部 em —— 所以缩小是「整列等比缩」，
+   四块之间的间距比例在任何 --p 下都恒定，不可能出现起点丢掉、箭头悬空、数字错位。 */
 .pin-num {
   position: absolute; inset: 0; z-index: 2;
   display: flex; align-items: center; justify-content: center;
-  padding: 104px 4vw 84px;
+  padding: 96px 4vw 80px;
   box-sizing: border-box;
-  transform: translate3d(calc(var(--p) * var(--num-x)), calc(var(--p) * var(--num-y)), 0);
+  transform: translate(calc(var(--p) * var(--num-x)), calc(var(--p) * var(--num-y)));
   will-change: transform;
 }
-.num-in {
-  width: calc((1 - var(--p)) * var(--num-w0) + var(--p) * var(--num-w1));
-  text-align: center;
-  transition: opacity 170ms ease;
-}
+.num-in { transition: opacity 170ms ease; }
 .pin-num.is-swap .num-in { opacity: 0; }
 
-/* 巨大数字上方：[ 国家 ] 指标 */
-.hero-tag {
-  margin: 0 0 clamp(10px, 1.8vh, 24px);
-  display: flex; align-items: baseline; flex-wrap: wrap;
-  justify-content: center; gap: 10px;
-  font-size: calc((1 - var(--p)) * clamp(15px, 1.5vw, 21px) + var(--p) * clamp(13px, 1.02vw, 15px));
+.st-stack {
+  /* 唯一的尺寸旋钮：居中时放大 (1 + --k0)，落位时回到 1 倍 */
+  --k: calc(1 + (1 - var(--p)) * var(--k0));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: calc(var(--stack-fs) * var(--k));
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ① 标题块：永远置顶 */
+.st-head {
+  margin: 0 0 0.9em;
+  display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap;
+  gap: 0.5em;
+  font-size: 0.8em; line-height: 1.5;
   letter-spacing: 0.02em;
 }
-.hero-tag b {
+.st-head b {
   font-family: var(--mono); font-weight: 700;
-  font-size: 1.25em; letter-spacing: 0.06em;
+  font-size: 1.1em; letter-spacing: 0.06em;
   color: #7FE6F8;
   text-shadow: 0 0 24px rgba(34, 211, 238, 0.45);
 }
-.hero-tag span { color: #D6E2EF; font-weight: 500; }
-.hero-tag span::before {
+.st-head span { color: #D6E2EF; font-weight: 500; }
+.st-head span::before {
   content: ""; display: inline-block;
-  width: 14px; height: 1px; margin-right: 10px;
+  width: 0.9em; height: 1px; margin-right: 0.55em;
   vertical-align: middle;
   background: rgba(34, 211, 238, 0.55);
 }
 
-/* 单值结构：年份 + 巨大数字 + 发光下落箭头，竖着排 */
-.st-hero { display: flex; flex-direction: column; align-items: center; }
+/* ② 起点块：1990 年 53.6 ‰ —— 一直在，动画里只会被箭头指离 */
+.st-from {
+  margin: 0;
+  display: flex; align-items: baseline; justify-content: center;
+  gap: 0.55em;
+  font-size: 0.78em; line-height: 1.6;
+  color: #8FA3B8;
+}
+/* 「起点」两个字：只用来解释这一行为什么是固定不动的对照点 */
+.st-from-tag {
+  font-style: normal;
+  font-family: var(--font); font-size: 0.85em; font-weight: 500;
+  letter-spacing: 0.18em;
+  color: rgba(148, 197, 214, 0.5);
+}
+.st-from-k {
+  font-family: var(--mono); font-size: 1em;
+  letter-spacing: 0.1em; color: #8FA3B8;
+}
+.st-from-k b {
+  font-family: var(--mono); font-weight: 700; font-size: 1.08em;
+  letter-spacing: 0.1em; font-variant-numeric: tabular-nums;
+  color: #A8BCCD;
+}
+.st-from-v { display: inline-flex; align-items: baseline; gap: 0.22em; }
+.st-from-v b {
+  font-family: var(--mono); font-weight: 700; font-size: 1.72em;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+  color: #C9DDE9;
+}
+.st-from-v i {
+  font-style: normal; font-family: var(--mono); font-size: 0.86em;
+  color: #7C93A8;
+}
 
-/* 下方：一整条 SVG 画的发光箭头——永远朝下（时间的方向），光段沿线延伸 */
-.st-drop {
-  --drop-h: 60px;
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
-  margin: 8px 0 0;
+/* ③ 连贯箭头：一根 2px 竖线 + 底部实心小三角，永远连接起点与终点 */
+.st-arrow {
+  position: relative; flex: none;
+  width: 2px;
+  height: 3.7em;
+  margin: 0.6em 0 0.8em;
+  border-radius: 1px;
+  background: linear-gradient(180deg,
+    rgba(34, 211, 238, 0.04) 0%,
+    rgba(34, 211, 238, 0.42) 58%,
+    #67E8F9 100%);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.42), 0 0 2px rgba(34, 211, 238, 0.75);
 }
-.st-drop-svg {
-  display: block;
-  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.55));
+.st-arrow::after {
+  content: ""; position: absolute; left: 50%; top: 100%;
+  transform: translateX(-50%);
+  width: 0; height: 0;
+  border-left: 4.5px solid transparent;
+  border-right: 4.5px solid transparent;
+  border-top: 7px solid #67E8F9;
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.85));
 }
-/* 发光延伸：一段亮光沿着箭头线从起点流向现在，循环 */
-.st-flow {
-  stroke-dasharray: 13 51;
-  animation: stFlow 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+/* 线上流动的一段光：沿同一根线向下走，强化「时间在往前走」 */
+.st-arrow i {
+  position: absolute; left: 50%; top: 0;
+  width: 2px; height: 34%;
+  transform: translate(-50%, -110%);
+  background: linear-gradient(180deg,
+    rgba(165, 243, 252, 0) 0%,
+    rgba(165, 243, 252, 0.95) 55%,
+    rgba(165, 243, 252, 0) 100%);
+  animation: stArrowFlow 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
-@keyframes stFlow {
-  from { stroke-dashoffset: 64; opacity: 0.25; }
-  18%  { opacity: 1; }
-  to   { stroke-dashoffset: 0; opacity: 0.25; }
+@keyframes stArrowFlow {
+  0%   { transform: translate(-50%, -110%); opacity: 0; }
+  14%  { opacity: 1; }
+  78%  { opacity: 1; }
+  100% { transform: translate(-50%, 294%); opacity: 0; }
 }
+
+/* ④ 动态数字块：年份（今天）+ 巨大数字 */
+.st-now { display: flex; flex-direction: column; align-items: center; margin: 0; }
 
 .st-tick {
   position: relative;
-  margin: 0 0 2px; display: flex; align-items: baseline; gap: 4px;
+  margin: 0 0 0.26em; display: flex; align-items: baseline; gap: 0.3em;
   line-height: 1.3;
-  font-family: var(--mono); font-size: 13px; letter-spacing: 0.14em;
+  font-family: var(--mono); font-size: 0.8em; letter-spacing: 0.14em;
   color: rgba(34, 211, 238, 0.72);
 }
 .st-tick b {
-  font-family: var(--mono); font-size: 14.5px; font-weight: 700;
+  font-family: var(--mono); font-size: 1.08em; font-weight: 700;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
   color: #7FE6F8;
 }
 .st-tick em { font-style: normal; letter-spacing: 0.12em; }
 .st-tick-now {
   /* 绝对定位：不占位，年份跳动时不会被这个后出现的标签推来推去 */
-  position: absolute; left: 100%; top: 50%; margin-left: 9px;
-  padding: 3px 10px 2px;
-  font-family: var(--font); font-size: 12.5px; font-weight: 600;
+  position: absolute; left: 100%; top: 50%; margin-left: 0.7em;
+  padding: 0.22em 0.8em 0.16em;
+  font-family: var(--font); font-size: 0.95em; font-weight: 600;
   letter-spacing: 0.12em; white-space: nowrap;
   color: var(--end); background: var(--end-soft);
   border: 1px solid var(--end-line); border-radius: 999px;
@@ -912,10 +982,11 @@ body[data-view="country"] .hud-rail { display: none; }
 .is-settled .st-tick-now { opacity: 1; transform: translateY(-50%); }
 .st-tick-now[hidden] { display: none; }
 
-/* 字号挂在容器上，单位跟着等比走；一个字号的插值贯穿两屏 */
+/* 字号挂在容器上，单位跟着等比走；整列只有这一个字号旋钮 */
 .st-big {
-  display: flex; align-items: baseline; justify-content: center; gap: 10px;
-  font-size: calc((1 - var(--p)) * var(--fs0) + var(--p) * var(--fs1));
+  margin: 0;
+  display: flex; align-items: baseline; justify-content: center; gap: 0.1em;
+  font-size: 5.6em;
   line-height: 0.86;
 }
 .st-big b {
@@ -1196,20 +1267,18 @@ body[data-view="country"] .hud-rail { display: none; }
 .data-table th:first-child, .data-table td:first-child { text-align: left; }
 
 /* ---------- 详情页响应式 ---------- */
-/* 1024 宽仍然容得下左右两栏，再窄才上下分 */
+/* 1100 以下左栏稍微靠里一点，给折线留出年份刻度 */
 @media (max-width: 1100px) {
-  .pin { --num-x: -27vw; }
+  .pin { --num-x: -26vw; --stack-fs: 15px; --k0: 0.66; }
 }
 
 @media (max-width: 900px) {
   /* 上下分：数字在上，折线在下 */
   .pin {
     --num-x: 0vw;
-    --num-y: -15vh;
-    --num-w0: 90vw;
-    --num-w1: 84vw;
-    --fs0: clamp(78px, 24vw, 138px);
-    --fs1: clamp(44px, 9vw, 62px);
+    --num-y: -14vh;
+    --stack-fs: 13px;
+    --k0: 0.52;
   }
   .pin-num { padding: 92px 5vw 84px; }
   .pin-chart {
@@ -1226,18 +1295,13 @@ body[data-view="country"] .hud-rail { display: none; }
   .pin-bar { padding: 12px 5vw 0; }
   .pin-id { display: none; }
   .story-back { font-size: 13.5px; padding: 5px 12px 5px 9px; }
-  .pin { --num-y: -17vh; --fs1: clamp(42px, 11vw, 56px); }
+  .pin { --num-y: -16vh; --stack-fs: 12px; --k0: 0.48; }
   .pin-num { padding: 78px 5vw 76px; }
   .pin-tabs { top: 52px; }
   .ind-pick { top: 54px; }
   .tab { font-size: 13px; padding: 6px 12px 5px; }
   .pick-btn { font-size: 12.5px; padding: 6px 11px 5px; }
   .pick-menu { min-width: 208px; }
-  .hero-tag { gap: 7px; }
-  .st-big { gap: 6px; }
-  .st-drop { margin: 6px 0 0; --drop-h: 46px; }
-  .st-tick b { font-size: 13.5px; letter-spacing: 0.12em; }
-  .st-tick-now { font-size: 11.5px; padding: 2px 8px 1px; margin-left: 8px; }
   .chart-title { font-size: 15.5px; flex: 1 1 auto; }
   .chart-sub { font-size: 11.5px; order: 3; flex-basis: 100%; margin-top: -2px; }
   .chart-delta { font-size: 16px; }
@@ -1255,14 +1319,14 @@ body[data-view="country"] .hud-rail { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .story, .num-in, .hero-tag, .st-big b, .st-tick-now, .st-drop,
+  .story, .num-in, .st-big b, .st-tick-now,
   .ch-tail, .chart-delta, .tab, .pick-menu, .pin-chart, .pin-num {
     transition-duration: 1ms !important;
     transition-delay: 0ms !important;
   }
   .is-settled .st-big b,
   .ch-tail.is-on .ch-end, .ch-tail.is-on .ch-halo { animation: none; }
-  .st-flow, .pin-hint svg { animation: none; }
+  .st-arrow i, .pin-hint svg { animation: none; }
 }
 
 /* ---------- 页脚 ---------- */
