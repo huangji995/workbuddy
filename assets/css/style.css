@@ -100,13 +100,21 @@ button { font: inherit; color: inherit; }
   color: var(--accent-dim);
 }
 .hero h1 {
-  margin: 0 0 14px;
-  font-size: 38px;
-  line-height: 1.24;
+  margin: 0 0 10px;
+  font-size: clamp(34px, 4.6vw, 50px);
+  line-height: 1.22;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: 0.02em;
   color: var(--ink);
-  text-shadow: 0 0 42px rgba(6, 181, 212, 0.18);
+  text-shadow: 0 0 44px rgba(6, 181, 212, 0.24), 0 0 96px rgba(34, 211, 238, 0.14);
+}
+/* 主标题下的小副标题：《事实》出处，等宽小字 */
+.hero-sub {
+  margin: 0 0 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  color: var(--accent-dim);
 }
 .lede { margin: 0; color: var(--ink-2); font-size: 17px; line-height: 1.75; }
 .lede strong { color: var(--ink); font-weight: 600; }
@@ -1441,6 +1449,19 @@ body.bub-modal-open { overflow: hidden; }
 }
 .story-tail-link:hover { color: var(--neon); }
 
+/* 详情页最底部：极简版权与题眼 */
+.story-tail-credit {
+  margin: 56px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.9;
+  letter-spacing: 0.2em;
+  color: var(--ink-3);
+  text-wrap: balance;
+}
+
 /* 无数据 / 找不到时的简易版 */
 .story-plain { padding: 40px 0; }
 .back {
@@ -1629,7 +1650,8 @@ body[data-view="country"] .site-foot { display: none; }
   .hud-rail-side { display: none; }
   .app { padding: 0 14px 40px; }
   .hero { padding: 30px 0 20px; }
-  .hero h1 { font-size: 26px; }
+  .hero h1 { font-size: 30px; }
+  .hero-sub { font-size: 11.5px; letter-spacing: 0.1em; }
   .lede { font-size: 16px; }
   .macro-bar { margin-top: 12px; padding: 7px 12px; gap: 2px 10px; }
   .macro-bar-k { font-size: 10px; letter-spacing: 0.1em; }
@@ -1972,6 +1994,18 @@ body.calib-open { overflow: hidden; }
   font-weight: 600;
   color: var(--hud-ink);
 }
+/* 结算页点题句：紧跟在分数下方，左侧一道青线像引用 */
+.calib-creed {
+  margin: 0 0 20px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(34, 211, 238, 0.55);
+  max-width: 100%;
+  font-size: 14.5px;
+  line-height: 1.82;
+  letter-spacing: 0.02em;
+  color: #CBD5E1;
+}
+
 .calib-line {
   margin: 0 0 20px;
   max-width: 40ch;
@@ -2080,6 +2114,9 @@ body.boot-open { overflow: hidden; }
   letter-spacing: 0.04em;
   color: #7C90A6;
   white-space: pre-wrap;
+  /* 只在空格处折行，别把「循此苦旅」或人名拆成两半；实在放不下才强制断 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   min-height: 1.75em;
 }
 .boot-line.boot-hd {
@@ -2096,6 +2133,18 @@ body.boot-open { overflow: hidden; }
   letter-spacing: 0.04em;
   color: #7FE6F8;
   text-shadow: 0 0 22px rgba(34, 211, 238, 0.75), 0 0 64px rgba(34, 211, 238, 0.4);
+}
+
+/* 启动日志最后一行：全篇题眼，亮青色收尾 */
+.boot-line.boot-creed {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #22D3EE;
+  text-shadow: 0 0 20px rgba(34, 211, 238, 0.7), 0 0 58px rgba(34, 211, 238, 0.34);
+  /* 窄屏会折行：让浏览器把两行折得均匀，不要在「ASTRA ]」处孤零零断掉 */
+  text-wrap: balance;
 }
 
 .boot-caret {
@@ -2120,4 +2169,9 @@ body.boot-open { overflow: hidden; }
   .ind-bar { justify-content: flex-start; margin: 4px 0 14px; padding: 0 2px; }
   .ind-bar-k { display: none; }
   .ind-pill { font-size: 12.5px; padding: 5px 11px 4px; }
+  /* 390px 宽放不下 18.75px 的出处行，缩到刚好一行 */
+  .boot-line.boot-src { font-size: 13.5px; text-wrap: balance; }
+  .boot-line.boot-creed { font-size: 12.5px; letter-spacing: 0.06em; }
+  /* 底部版权行在手机上缩一档，避免折成三行 */
+  .story-tail-credit { font-size: 9.5px; letter-spacing: 0.12em; }
 }

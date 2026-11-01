@@ -218,6 +218,7 @@
       + '      <p class="story-tail-p" id="tailNote"></p>'
       + '      <div id="tailTable"></div>'
       + '      <a class="story-tail-link" href="#/">← 回到地球</a>'
+      + '      <p class="story-tail-credit">DATA INSPIRED BY HANS ROSLING // PER ASPERA AD ASTRA</p>'
       + '    </div>'
       + '  </section>'
       + '</section>';

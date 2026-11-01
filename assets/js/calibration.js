@@ -154,6 +154,7 @@
     return '<p class="calib-step">CALIBRATION COMPLETE</p>'
       + '<div class="calib-score"><b>' + state.score + '</b><span>/ ' + total + '</span></div>'
       + '<p class="calib-verdict">你的认知准确度：' + state.score + ' / ' + total + '</p>'
+      + '<p class="calib-creed">我们或许还没抵达群星，但数据证明，人类正在一步步走向它。</p>'
       + '<ul class="calib-recap">' + rows + '</ul>'
       + '<p class="calib-invite">这个世界，比你想象的要好。来看看真实的数据。</p>'
       + '<button class="calib-cta" id="calibCta" type="button">[ 进入真实数据地球 -&gt; ]</button>';

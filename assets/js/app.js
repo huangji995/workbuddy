@@ -40,8 +40,8 @@
       if (GPM.calibration) GPM.calibration.maybeOpen();
     }
     document.title = r.view === 'country'
-      ? (countryName(r.iso2) + ' · 全球进步地图')
-      : '全球进步地图 · 世界正在变好的地方';
+      ? (countryName(r.iso2) + ' · 循此苦旅，终抵群星')
+      : '循此苦旅，终抵群星 · 《事实》全球进步数据可视化';
   }
 
   function countryName(iso2) {
