@@ -912,44 +912,61 @@ body[data-view="country"] .hud-rail { display: none; }
   color: #7C93A8;
 }
 
-/* ③ 连贯箭头：一根 2px 竖线 + 底部实心小三角，永远连接起点与终点 */
+/* ③ 连贯箭头：竖线 + 实心小三角 + 沿线滑落的光点（CSS 重绘，不用图片）
+   .st-arrow 是这三个零件的唯一容器，高度由 em 决定，所以整列缩放时箭头等比跟着变。 */
 .st-arrow {
   position: relative; flex: none;
+  width: 16px;
+  height: 3.9em;
+  margin: 0.55em 0 0.72em;
+}
+/* 线：2px，从暗青渐变到亮青，带外发光。高度让出底部 9px 给三角 */
+.st-arrow-line {
+  position: absolute; left: 50%; top: 0;
   width: 2px;
-  height: 3.7em;
-  margin: 0.6em 0 0.8em;
+  height: calc(100% - 9px);
+  transform: translateX(-50%);
   border-radius: 1px;
   background: linear-gradient(180deg,
-    rgba(34, 211, 238, 0.04) 0%,
-    rgba(34, 211, 238, 0.42) 58%,
-    #67E8F9 100%);
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.42), 0 0 2px rgba(34, 211, 238, 0.75);
+    rgba(8, 87, 110, 0.42) 0%,
+    rgba(34, 211, 238, 0.55) 46%,
+    #7FE6F8 100%);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.32);
+  transition: box-shadow 400ms ease;
 }
-.st-arrow::after {
-  content: ""; position: absolute; left: 50%; top: 100%;
+/* 三角：实心，尖朝下，正好接在线的末端 */
+.st-arrow-tip {
+  position: absolute; left: 50%; bottom: 0;
   transform: translateX(-50%);
   width: 0; height: 0;
-  border-left: 4.5px solid transparent;
-  border-right: 4.5px solid transparent;
-  border-top: 7px solid #67E8F9;
-  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.85));
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 9px solid #7FE6F8;
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.8));
 }
-/* 线上流动的一段光：沿同一根线向下走，强化「时间在往前走」 */
-.st-arrow i {
+/* 光点：从线的顶端一路滑到尖端（top 100%），停住 → 涨开 → 消散 */
+.st-arrow-orb {
   position: absolute; left: 50%; top: 0;
-  width: 2px; height: 34%;
-  transform: translate(-50%, -110%);
-  background: linear-gradient(180deg,
-    rgba(165, 243, 252, 0) 0%,
-    rgba(165, 243, 252, 0.95) 55%,
-    rgba(165, 243, 252, 0) 100%);
-  animation: stArrowFlow 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    #FFFFFF 0%, #A5F3FC 40%, rgba(34, 211, 238, 0) 72%);
+  box-shadow: 0 0 10px 2px rgba(34, 211, 238, 0.7);
+  animation: stOrbDrop 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
-@keyframes stArrowFlow {
-  0%   { transform: translate(-50%, -110%); opacity: 0; }
-  14%  { opacity: 1; }
-  78%  { opacity: 1; }
-  100% { transform: translate(-50%, 294%); opacity: 0; }
+@keyframes stOrbDrop {
+  0%   { top: 0;    opacity: 0;    transform: scale(0.55); }
+  10%  { opacity: 1;               transform: scale(1); }
+  60%  { top: 100%; opacity: 1;    transform: scale(1); }
+  /* 停在尖端：能量注入，涨开一圈再散掉 */
+  72%  { top: 100%; opacity: 0.9;  transform: scale(2.1); }
+  86%  { top: 100%; opacity: 0;    transform: scale(2.7); }
+  100% { top: 100%; opacity: 0;    transform: scale(0.55); }
+}
+/* 数字跳动那 2.1 秒里，光点加速注入，线也更亮 */
+.is-rolling .st-arrow-orb { animation-duration: 0.9s; }
+.is-rolling .st-arrow-line {
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.62), 0 0 3px rgba(127, 230, 248, 0.9);
 }
 
 /* ④ 动态数字块：年份（今天）+ 巨大数字 */
@@ -1326,7 +1343,7 @@ body[data-view="country"] .hud-rail { display: none; }
   }
   .is-settled .st-big b,
   .ch-tail.is-on .ch-end, .ch-tail.is-on .ch-halo { animation: none; }
-  .st-arrow i, .pin-hint svg { animation: none; }
+  .st-arrow-orb, .pin-hint svg { animation: none; }
 }
 
 /* ---------- 页脚 ---------- */

@@ -14,8 +14,10 @@
 
   var DECOR = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* 固定动画时长：与滚动位置无关 */
+  /* 动画总长：与滚动位置无关 */
   var ANIM_DUR = 2500;
+  /* 阶段一：纯几何变形，0 → 0.4 秒。这段时间数字一动不动。 */
+  var GEO_DUR = 400;
   /* 重置（平滑退回第一屏）用时，短一些，别让人觉得画面在拖 */
   var RESET_DUR = 380;
 
@@ -28,11 +30,8 @@
   function easeIO(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
-  /* 数字动画用 easeOutCubic：一进场就冲，尾段减速收住 */
+  /* 数字与几何都用 easeOutCubic：一进场就冲，尾段减速收住 */
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
-  /* 几何变形用「easeOut 与 easeInOut 的中点」：起点跟得上数字的冲刺，
-     结尾又收得住。直接上 easeInOut 会显得画面比数字慢半拍，像「先跳完再变形」。 */
-  function easeGeo(t) { return (easeOut(t) + easeIO(t)) / 2; }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
@@ -179,8 +178,12 @@
       + '              <span class="st-from-k"><b id="fromYear">1990</b> 年</span>'
       + '              <span class="st-from-v"><b id="fromVal">—</b><i id="fromUnit"></i></span>'
       + '            </p>'
-      /* ③ 连贯箭头：一根 2px 竖线 + 底部小三角，上下都贴着相邻块，不悬空 */
-      + '            <div class="st-arrow" aria-hidden="true"><i></i></div>'
+      /* ③ 连贯箭头：竖线 + 实心小三角 + 沿线滑落的光点（三件都是同一根线的零件） */
+      + '            <div class="st-arrow" aria-hidden="true">'
+      + '              <span class="st-arrow-line"></span>'
+      + '              <span class="st-arrow-tip"></span>'
+      + '              <span class="st-arrow-orb"></span>'
+      + '            </div>'
       /* ④ 动态数字块：年份（今天）+ 巨大数字 */
       + '            <div class="st-now">'
       + '              <p class="st-tick"><b id="stYear">1990</b><em>年</em>'
@@ -305,17 +308,23 @@
       return function (t) { return t; };
     }
 
-    function timeline(durSec, tweens, onDone) {
+    /* 每个 tween 可以自带 duration / position（秒），不写就用整条时间轴的长度、从 0 开始。
+       这样一条 timeline 里可以排「0–0.4s 只变形」+「0.4–2.5s 只跳数字」两个阶段。 */
+    function timeline(totalSec, tweens, onDone) {
       if (window.gsap) {
         var t = window.gsap.timeline({ onComplete: onDone });
         tweens.forEach(function (tw) {
-          var vars = { duration: durSec, ease: tw.ease, onUpdate: tw.onUpdate };
+          var vars = {
+            duration: tw.duration == null ? totalSec : tw.duration,
+            ease: tw.ease || 'none',
+            onUpdate: tw.onUpdate
+          };
           for (var k in tw.to) if (Object.prototype.hasOwnProperty.call(tw.to, k)) vars[k] = tw.to[k];
-          t.to(tw.obj, vars, 0);       // 位置参数 0：全部同时开始
+          t.to(tw.obj, vars, tw.position || 0);
         });
         return t;
       }
-      /* 退化路径：同一个循环推进所有 tween */
+      /* 退化路径：同一个循环推进所有 tween，按各自的起止换算局部进度 */
       var raf = null, t0 = 0, alive = true;
       var from = tweens.map(function (tw) {
         var f = {};
@@ -325,9 +334,12 @@
       function step(ts) {
         if (!alive) return;
         if (!t0) t0 = ts;
-        var t = Math.min(1, (ts - t0) / (durSec * 1000));
+        var t = Math.min(1, (ts - t0) / (totalSec * 1000));
         tweens.forEach(function (tw, i) {
-          var e = easeToFn(tw.ease)(t);
+          var st = (tw.position || 0) / totalSec;
+          var du = (tw.duration == null ? totalSec : tw.duration) / totalSec;
+          var lt = du > 0 ? Math.min(1, Math.max(0, (t - st) / du)) : 1;
+          var e = easeToFn(tw.ease)(lt);
           for (var k in tw.to) {
             if (!Object.prototype.hasOwnProperty.call(tw.to, k)) continue;
             tw.obj[k] = from[i][k] + (tw.to[k] - from[i][k]) * e;
@@ -357,7 +369,10 @@
       nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
     }
 
-    /* 触发：固定 2.5 秒。滚轮只负责「叫醒它」，之后停在哪里都不打断、不反向。 */
+    /* 触发：固定 2.5 秒，分两个阶段。
+       阶段一 0–0.4s：纯几何 —— 整列从正中滑到左侧并缩好，数字一动不动、折线一笔不画；
+       阶段二 0.4–2.5s：数字 1990 → 2024 跳动，折线同步开始画，两者 2.5 秒一起收住。
+       滚轮只负责「叫醒它」，之后停在哪里都不打断、不反向。 */
     function play(geoTo) {
       stopAnim();
       if (DECOR) { finish(geoTo); return; }
@@ -368,17 +383,17 @@
       paintAt(0);
       var o = { v: 0, p: geom };
       tl = timeline(ANIM_DUR / 1000, [
-        /* 动作 A：数字与年份 1990 → 2024，折线笔尖同步 */
+        /* 阶段一：--p 0 → 1，整列位移 + 等比缩小。到此为止只动版式。 */
         {
-          obj: o, to: { v: 1 }, ease: 'power2.out',
-          onUpdate: function () { paintAt(o.v); }
-        },
-        /* 动作 B：--p 同步推到底 —— 整列平移缩小的 CSS 全挂在这个值上。
-           缓动用「easeOut 与 easeInOut 的中点」：开头跟得上数字的冲刺，
-           结尾又收得住，不会比数字慢半拍。 */
-        {
-          obj: o, to: { p: geoTo }, ease: easeGeo,
+          obj: o, to: { p: geoTo },
+          duration: GEO_DUR / 1000, position: 0, ease: 'power2.out',
           onUpdate: function () { paintGeo(o.p); }
+        },
+        /* 阶段二：版式已经站定，数字才开始跳；折线笔尖跟着同一个 e 走。 */
+        {
+          obj: o, to: { v: 1 },
+          duration: (ANIM_DUR - GEO_DUR) / 1000, position: GEO_DUR / 1000, ease: 'power2.out',
+          onUpdate: function () { paintAt(o.v); }
         }
       ], function () {
         tl = null;
