@@ -302,8 +302,10 @@
     }
 
     paint();
+    var self = node;
     requestAnimationFrame(function () {
-      requestAnimationFrame(function () { node.classList.add('is-in'); });
+      /* 双 rAF 落地前可能已经被 close() 掉（快速切路由），别对 null 操作 */
+      requestAnimationFrame(function () { if (node === self) self.classList.add('is-in'); });
     });
   }
 

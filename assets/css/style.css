@@ -617,9 +617,10 @@ button { font: inherit; color: inherit; }
 }
 
 /* =========================================================
-   详情页 · 双屏滚动
-   第 1 屏：屏幕正中的巨大数字；第 2 屏：数字缩到左栏、折线从右侧滑出。
-   进度 --p 完全由滚动位置算出（0 → 1），所以上滚必然逆向退回第一屏。
+   详情页 · Sticky 双屏舞台
+   第 1 屏：屏幕正中的巨大数字（--p:0）；第 2 屏：数字缩到左栏、折线从右侧滑出（--p:1）。
+   --p 只由 country-view.js 里那段 2.5 秒的复合动画写入，绝不映射滚动位置——
+   数字跳动与几何变形共用同一个 t，同时开始同时结束。
    ========================================================= */
 body[data-view="country"] .app { max-width: none; padding: 0; }
 body[data-view="country"] .hud-rail { display: none; }
@@ -955,10 +956,10 @@ body[data-view="country"] .hud-rail { display: none; }
   opacity: calc((var(--p) - 0.34) / 0.4);
   transform: translateX(calc((1 - var(--p)) * 5vw));
   pointer-events: none;
-  transition: opacity 170ms ease;
 }
 .story[data-scr="detail"] .pin-chart { pointer-events: auto; }
-.pin-chart.is-swap { opacity: 0; }
+/* 切指标时的短暂淡出：只在 is-swap 时给过渡，避免 --p 逐帧变化被 170ms 拖慢 */
+.pin-chart.is-swap { opacity: 0; transition: opacity 170ms ease; }
 .chart-head {
   display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px;
   margin-bottom: 12px;
@@ -1207,7 +1208,7 @@ body[data-view="country"] .hud-rail { display: none; }
     --num-y: -15vh;
     --num-w0: 90vw;
     --num-w1: 84vw;
-    --fs0: clamp(70px, 20vw, 130px);
+    --fs0: clamp(78px, 24vw, 138px);
     --fs1: clamp(44px, 9vw, 62px);
   }
   .pin-num { padding: 92px 5vw 84px; }

@@ -1,8 +1,12 @@
-/* 国家详情：双屏滚动叙事（Hero → Detail）+ 全局指标状态。
-   时间轴由「触发式动画」控制，不是滚动条映射：
-   进入第一屏 → 立刻播一段固定 2.5 秒的 easeOutCubic 动画（数字 1990→2024），
-   滚动条停在哪里都不影响它自己播完；播完画面定格，继续下滚才过渡到第二屏。
-   几何过渡（数字缩左、折线滑出）仍由滚动位置插值，所以上滚必然原路退回。 */
+/* 国家详情：Sticky 双屏舞台 + 复合动画（数据跳动与几何变形共用一条时间轴）。
+   初始：第一屏居中「[ 国家 ] 指标 / 1990 年 / 起点值」，右侧没有折线。
+   触发：用户向下滚动哪怕一点 → 立刻播一段固定 2.5 秒的动画，
+         动作 A（paintAt）数字与年份从 1990 跳到 2024；
+         动作 B（paintGeo）--p 从 0 走到 1：数字缩小左移、折线从右侧滑出并同步绘制。
+         两者由同一个 rAF 的同一个 t 推进，严格同起同落。
+   结束：定格在「2024 今天」，数字在左、折线在右，画面继续 sticky 固定。
+   重置：滚回舞台顶部（等价 toggleActions: play none none reset）→ 平滑退回第一屏。
+   注意：--p 只由这段动画写，绝不映射滚动位置。 */
 (function () {
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
@@ -12,20 +16,23 @@
 
   /* 固定动画时长：与滚动位置无关 */
   var ANIM_DUR = 2500;
+  /* 重置（平滑退回第一屏）用时，短一些，别让人觉得画面在拖 */
+  var RESET_DUR = 380;
 
-  /* 几何过渡窗口（占整个 200vh 舞台的比例）：数字缩到左栏、折线滑出 */
-  var GEO_A = 0.46, GEO_B = 0.84;
-
-  /* 第一屏的判定线：--p 之前都算「巨大数字」状态 */
-  var HERO_OUT = 0.45;
+  /* 触发/重置的滚动阈值（占整个 200vh 舞台的比例）：
+     滚过 1.5%（≈3vh，几像素的滚轮）就触发；退回 0.5% 才算「回到第一屏」。 */
+  var TRIGGER_AT = 0.015;
+  var RESET_AT = 0.005;
 
   function clamp01(t) { return t < 0 ? 0 : t > 1 ? 1 : t; }
-  function win(p, a, b) { return clamp01((p - a) / (b - a)); }
   function easeIO(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
   /* 数字动画用 easeOutCubic：一进场就冲，尾段减速收住 */
   function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+  /* 几何变形用「easeOut 与 easeInOut 的中点」：起点跟得上数字的冲刺，
+     结尾又收得住。直接上 easeInOut 会显得画面比数字慢半拍，像「先跳完再变形」。 */
+  function easeGeo(t) { return (easeOut(t) + easeIO(t)) / 2; }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
@@ -256,11 +263,13 @@
     var menuOpen = false;
     var animated = 'idle';        // idle | playing | settled
     var animRaf = null;
+    var geom = 0;                 // --p 的当前值，只由动画写
+    var heroMode = true;
 
     function setNum(v) { bigEl.textContent = numText(v, ind.decimals); }
     function setYear(y) { yearEl.textContent = String(y); }
 
-    /* ---------- 时间轴：固定 2.5 秒的独立动画，与滚动位置无关 ---------- */
+    /* ---------- 动作 A：数据跳动（数字 + 年份 + 折线笔尖） ---------- */
     function paintAt(e) {
       progress = e;
       setNum(m.base.value + (m.last.value - m.base.value) * e);
@@ -268,52 +277,94 @@
       if (chartView) chartView.setProgress(e);
     }
 
+    /* ---------- 动作 B：几何变形（--p 0 → 1） ----------
+       p=0 数字居中巨大、折线不可见；p=1 数字缩到左栏、折线滑出到位。 */
+    function paintGeo(g) {
+      geom = g;
+      pin.style.setProperty('--p', g.toFixed(4));
+      var hero = g < 0.5;
+      if (hero !== heroMode) {
+        heroMode = hero;
+        story.dataset.scr = hero ? 'hero' : 'detail';
+        if (!hero) closeMenu();
+      }
+    }
+
     function stopAnim() {
       if (animRaf) { cancelAnimationFrame(animRaf); animRaf = null; }
     }
 
-    /* 定格：数字落到最新一年，亮起「今天 / 最新」 */
-    function settleNow() {
+    /* 定格：数字落到最新一年，亮起「今天 / 最新」，几何收在 geoTo */
+    function finish(geoTo) {
       stopAnim();
       animated = 'settled';
       story.classList.remove('is-rolling');
       story.classList.add('is-settled');
       paintAt(1);
+      paintGeo(geoTo);
       nowEl.hidden = false;
       nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
     }
 
-    /* 触发：从头播 2.5 秒，滚动条停在哪里都自己播完 */
-    function play() {
+    /* 触发：一条 2.5 秒的时间轴，同时推进数值与几何，滚轮停在哪里都自己播完 */
+    function play(geoTo) {
       stopAnim();
-      if (DECOR) { settleNow(); return; }
+      if (DECOR) { finish(geoTo); return; }
       animated = 'playing';
       story.classList.remove('is-settled');
       story.classList.add('is-rolling');
       nowEl.hidden = true;
       paintAt(0);
+      var gFrom = geom;
       var t0 = 0;
       function step(ts) {
         if (!t0) t0 = ts;
         var t = Math.min(1, (ts - t0) / ANIM_DUR);
+        /* 同一个 t、同一条时间轴：动作 A 与动作 B 同时开始、同时结束 */
         paintAt(easeOut(t));
+        paintGeo(gFrom + (geoTo - gFrom) * easeGeo(t));
         if (t < 1) {
           animRaf = requestAnimationFrame(step);
         } else {
           animRaf = null;
-          settleNow();
+          finish(geoTo);
         }
       }
       animRaf = requestAnimationFrame(step);
     }
 
-    /* 重置：数字回到起点，折线清空，等待下一次触发 */
+    /* 重置：平滑退回第一屏（数字回起点、折线清空），等待下一次触发 */
     function resetAnim() {
+      if (animated === 'idle') return;
       stopAnim();
+      var gFrom = geom;
+      var pFrom = progress;
       animated = 'idle';
       story.classList.remove('is-rolling', 'is-settled');
       nowEl.hidden = true;
-      paintAt(0);
+      if (DECOR || (!gFrom && !pFrom)) {
+        paintAt(0);
+        paintGeo(0);
+        syncScroll();          // 重置期间又滚下去了就补一次触发
+        return;
+      }
+      var t0 = 0;
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var t = Math.min(1, (ts - t0) / RESET_DUR);
+        var e = 1 - easeOut(t);          // 从当前状态退回 0
+        paintAt(pFrom * e);
+        paintGeo(gFrom * e);
+        if (t < 1) {
+          animRaf = requestAnimationFrame(step);
+        } else {
+          animRaf = null;
+          paintAt(0);
+          paintGeo(0);
+          syncScroll();      // 重置期间又滚下去了就补一次触发
+        }
+      }
+      animRaf = requestAnimationFrame(step);
     }
 
     /* ---------- 折线 ---------- */
@@ -414,8 +465,9 @@
         drawChart();
         numStage.classList.remove('is-swap');
         chartStage.classList.remove('is-swap');
-        /* 在第一屏换：重播那 2.5 秒；已经在第二屏：直接落定 */
-        if (scrollP < HERO_OUT) play(); else settleNow();
+        /* 第一屏（几何还在正中）：只重播数字，版式不动；
+           已经变形到第二屏：直接给新指标的定型态 */
+        if (geom < 0.5) play(0); else finish(1);
       }, 170);
     }
 
@@ -459,69 +511,59 @@
     }
     document.addEventListener('pointerdown', onDocDown);
 
-    /* ---------- 滚动进度：scrollP 是原始滚动位置（0→1），
-       --p 是几何过渡进度（第一屏保持 0，数字跳完才开始过渡到第二屏） ---------- */
+    /* ---------- 滚动只做两件事：判断「有没有滚出一点」和「有没有退回顶部」，
+       绝不拿它去插值任何视觉属性 ---------- */
     var scrollP = 0;
-    var heroMode = true;
     var ticking = false;
 
-    function setP(p) {
-      scrollP = clamp01(p);
-      var g = easeIO(win(scrollP, GEO_A, GEO_B));
-      pin.style.setProperty('--p', g.toFixed(4));
-      var hero = scrollP < 0.52;
-      if (hero !== heroMode) {
-        heroMode = hero;
-        story.dataset.scr = hero ? 'hero' : 'detail';
-        if (!hero) closeMenu();
-      }
-    }
-
-    function measure() {
+    function syncScroll() {
       var total = stage.offsetHeight - window.innerHeight;
-      if (total <= 0) { setP(0); return; }
-      setP(-stage.getBoundingClientRect().top / total);
+      scrollP = total > 0 ? clamp01(-stage.getBoundingClientRect().top / total) : 0;
+
+      if (scrollP <= RESET_AT) {
+        /* 退回舞台顶部：重置，等下一次触发 */
+        if (animated === 'settled' || animated === 'playing') resetAnim();
+      } else if (scrollP > TRIGGER_AT && animated !== 'playing' && geom < 0.5) {
+        /* 滚了哪怕一点点、画面还在第一屏：触发一次完整的 2.5 秒复合动画。
+           geom >= 0.5 说明已经变形到位，不再重来；animated === 'playing' 时不重入。 */
+        play(1);
+      }
     }
 
     function onScroll() {
       if (ticking) return;
       ticking = true;
-      requestAnimationFrame(function () { ticking = false; measure(); });
+      requestAnimationFrame(function () { ticking = false; syncScroll(); });
     }
     window.addEventListener('scroll', onScroll, { passive: true });
 
-    /* ---------- 第一屏触发（IntersectionObserver，等价 toggleActions: play none none reset） ---------- */
+    /* ---------- 第一屏哨兵（IntersectionObserver）：
+       语义对齐 toggleActions —— 进入不自动播（等滚轮），从下方滚回第一屏（enterBack）时重置。
+       离开时不做任何事，否则向下经过第二屏会把左栏数字清成起点。 ---------- */
     var heroZone = mount.querySelector('#heroZone');
-    var heroIn = true;          // 详情页开门就在第一屏
-
-    var zoneIO = new IntersectionObserver(function (entries) {
+    var zoneIO = heroZone ? new IntersectionObserver(function (entries) {
       var e = entries[0];
-      var nowIn = e.isIntersecting && e.intersectionRatio >= 0.55;
-      if (nowIn === heroIn) return;
-      heroIn = nowIn;
-      if (nowIn) {
-        /* enter / enterBack：只有没播过（idle）才播，播过 / 正在播都不重来 */
-        if (animated === 'idle' && scrollP < HERO_OUT) play();
-      } else if (e.boundingClientRect.top > 0) {
-        /* leaveBack：从上方彻底离开第一屏 → 重置，等下一次再触发 */
-        resetAnim();
-      }
-    }, { threshold: [0, 0.55, 1] });
-    if (heroZone) zoneIO.observe(heroZone);
+      if (e.isIntersecting && e.intersectionRatio >= 0.9 && animated === 'settled') resetAnim();
+    }, { threshold: [0.9] }) : null;
+    if (zoneIO) zoneIO.observe(heroZone);
 
-    /* ---------- 首帧 ---------- */
+    /* ---------- 首帧：停在第 1 屏起点，什么都不播，等用户滚动 ---------- */
     story.dataset.scr = 'hero';
     syncControls();
     applyMeta();
+    paintGeo(0);
     drawChart();
     paintAt(0);
 
-    /* 路由在这一帧之后才把页面滚回顶部，所以量进度要等一帧；
-       量完再看是否真的在第一屏，在就立刻触发那 2.5 秒 */
+    /* 路由在这一帧之后才把页面滚回顶部，所以判定要等两帧，
+       否则从地图页中途点进来会被误判成「已经在第二屏」 */
     requestAnimationFrame(function () {
-      measure();
-      story.classList.add('is-in');
-      if (scrollP < HERO_OUT && animated === 'idle') play();
+      requestAnimationFrame(function () {
+        story.classList.add('is-in');
+        var total = stage.offsetHeight - window.innerHeight;
+        scrollP = total > 0 ? clamp01(-stage.getBoundingClientRect().top / total) : 0;
+        if (scrollP > 0.02) finish(1);   // 从别处回来（带滚动位置）：直接给定型态
+      });
     });
 
     /* ---------- 气泡图：进视口懒创建、只播一次 ---------- */
@@ -556,7 +598,6 @@
     function onResize() {
       clearTimeout(rt);
       rt = setTimeout(function () {
-        measure();
         drawChart();
         if (bubble) {
           bubble.destroy();
