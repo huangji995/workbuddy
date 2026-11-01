@@ -1,23 +1,31 @@
 /* 国家详情：双屏滚动叙事（Hero → Detail）+ 全局指标状态。
-   严格时间轴：进页只显示「国家 + 指标 + 起点值」，滚动才开始把数字从起点
-   跳到最新值；跳完之后，数字才缩到左栏、折线才滑出。两段进度都由滚动位置
-   直接算出（纯函数），上滚必然原路退回。 */
+   时间轴由「触发式动画」控制，不是滚动条映射：
+   进入第一屏 → 立刻播一段固定 2.5 秒的 easeOutCubic 动画（数字 1990→2024），
+   滚动条停在哪里都不影响它自己播完；播完画面定格，继续下滚才过渡到第二屏。
+   几何过渡（数字缩左、折线滑出）仍由滚动位置插值，所以上滚必然原路退回。 */
 (function () {
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
   var U = GPM.util;
 
-  /* 滚动窗口（占整个 200vh 舞台的比例）：
-     数字跳动 0.03 → 0.44；几何过渡（缩左移 + 折线滑入）0.46 → 0.84。
-     中间留 0.02 的间隙，让「定格在 2024 今天」先站稳再过渡。 */
-  var NUM_A = 0.03, NUM_B = 0.44;
+  var DECOR = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 固定动画时长：与滚动位置无关 */
+  var ANIM_DUR = 2500;
+
+  /* 几何过渡窗口（占整个 200vh 舞台的比例）：数字缩到左栏、折线滑出 */
   var GEO_A = 0.46, GEO_B = 0.84;
+
+  /* 第一屏的判定线：--p 之前都算「巨大数字」状态 */
+  var HERO_OUT = 0.45;
 
   function clamp01(t) { return t < 0 ? 0 : t > 1 ? 1 : t; }
   function win(p, a, b) { return clamp01((p - a) / (b - a)); }
   function easeIO(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
+  /* 数字动画用 easeOutCubic：一进场就冲，尾段减速收住 */
+  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
@@ -122,6 +130,8 @@
 
       /* ================= 双屏舞台：200vh，里面钉一个 100vh 的视口 ================= */
       + '  <div class="stage" id="stage">'
+      /* 第一屏哨兵：高度正好一屏，IntersectionObserver 用它判断「是否在第一屏」 */
+      + '    <div class="hero-zone" id="heroZone" aria-hidden="true"></div>'
       + '    <div class="pin" id="pin" style="--p:0">'
 
       /* 顶栏：返回 + 地区（第二屏出现时不遮挡胶囊） */
@@ -244,27 +254,66 @@
     var progress = 0;
     var swapToken = 0;
     var menuOpen = false;
+    var animated = 'idle';        // idle | playing | settled
+    var animRaf = null;
 
     function setNum(v) { bigEl.textContent = numText(v, ind.decimals); }
     function setYear(y) { yearEl.textContent = String(y); }
 
-    /* 滚动 → 数字时间轴：0 = 起点定格，1 = 落定在最新一年。
-       只由 scrollP 推导，进页时不播放任何东西，滚动才开始跳。 */
-    function applyNum() {
-      var t = win(scrollP, NUM_A, NUM_B);
-      var e = easeIO(t);
+    /* ---------- 时间轴：固定 2.5 秒的独立动画，与滚动位置无关 ---------- */
+    function paintAt(e) {
       progress = e;
       setNum(m.base.value + (m.last.value - m.base.value) * e);
       setYear(Math.round(m.base.year + (m.last.year - m.base.year) * e));
       if (chartView) chartView.setProgress(e);
-      var settled = t >= 1;
-      story.classList.toggle('is-rolling', t > 0 && !settled);
-      story.classList.toggle('is-settled', settled);
-      nowEl.hidden = !settled;
-      if (settled) {
-        /* 最新年份不在今年附近时说「最新」，别硬说「今天」 */
-        nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
+    }
+
+    function stopAnim() {
+      if (animRaf) { cancelAnimationFrame(animRaf); animRaf = null; }
+    }
+
+    /* 定格：数字落到最新一年，亮起「今天 / 最新」 */
+    function settleNow() {
+      stopAnim();
+      animated = 'settled';
+      story.classList.remove('is-rolling');
+      story.classList.add('is-settled');
+      paintAt(1);
+      nowEl.hidden = false;
+      nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
+    }
+
+    /* 触发：从头播 2.5 秒，滚动条停在哪里都自己播完 */
+    function play() {
+      stopAnim();
+      if (DECOR) { settleNow(); return; }
+      animated = 'playing';
+      story.classList.remove('is-settled');
+      story.classList.add('is-rolling');
+      nowEl.hidden = true;
+      paintAt(0);
+      var t0 = 0;
+      function step(ts) {
+        if (!t0) t0 = ts;
+        var t = Math.min(1, (ts - t0) / ANIM_DUR);
+        paintAt(easeOut(t));
+        if (t < 1) {
+          animRaf = requestAnimationFrame(step);
+        } else {
+          animRaf = null;
+          settleNow();
+        }
       }
+      animRaf = requestAnimationFrame(step);
+    }
+
+    /* 重置：数字回到起点，折线清空，等待下一次触发 */
+    function resetAnim() {
+      stopAnim();
+      animated = 'idle';
+      story.classList.remove('is-rolling', 'is-settled');
+      nowEl.hidden = true;
+      paintAt(0);
     }
 
     /* ---------- 折线 ---------- */
@@ -365,7 +414,8 @@
         drawChart();
         numStage.classList.remove('is-swap');
         chartStage.classList.remove('is-swap');
-        applyNum();
+        /* 在第一屏换：重播那 2.5 秒；已经在第二屏：直接落定 */
+        if (scrollP < HERO_OUT) play(); else settleNow();
       }, 170);
     }
 
@@ -425,7 +475,6 @@
         story.dataset.scr = hero ? 'hero' : 'detail';
         if (!hero) closeMenu();
       }
-      applyNum();
     }
 
     function measure() {
@@ -441,17 +490,38 @@
     }
     window.addEventListener('scroll', onScroll, { passive: true });
 
+    /* ---------- 第一屏触发（IntersectionObserver，等价 toggleActions: play none none reset） ---------- */
+    var heroZone = mount.querySelector('#heroZone');
+    var heroIn = true;          // 详情页开门就在第一屏
+
+    var zoneIO = new IntersectionObserver(function (entries) {
+      var e = entries[0];
+      var nowIn = e.isIntersecting && e.intersectionRatio >= 0.55;
+      if (nowIn === heroIn) return;
+      heroIn = nowIn;
+      if (nowIn) {
+        /* enter / enterBack：只有没播过（idle）才播，播过 / 正在播都不重来 */
+        if (animated === 'idle' && scrollP < HERO_OUT) play();
+      } else if (e.boundingClientRect.top > 0) {
+        /* leaveBack：从上方彻底离开第一屏 → 重置，等下一次再触发 */
+        resetAnim();
+      }
+    }, { threshold: [0, 0.55, 1] });
+    if (heroZone) zoneIO.observe(heroZone);
+
     /* ---------- 首帧 ---------- */
     story.dataset.scr = 'hero';
     syncControls();
     applyMeta();
     drawChart();
+    paintAt(0);
 
-    /* 路由在这一帧之后才把页面滚回顶部，所以量进度要等一帧。
-       不播放任何动画：applyNum 由滚动位置算出，进页即起点状态。 */
+    /* 路由在这一帧之后才把页面滚回顶部，所以量进度要等一帧；
+       量完再看是否真的在第一屏，在就立刻触发那 2.5 秒 */
     requestAnimationFrame(function () {
       measure();
       story.classList.add('is-in');
+      if (scrollP < HERO_OUT && animated === 'idle') play();
     });
 
     /* ---------- 气泡图：进视口懒创建、只播一次 ---------- */
@@ -500,7 +570,9 @@
 
     return function cleanup() {
       clearTimeout(rt);
+      stopAnim();
       offState();
+      if (zoneIO) zoneIO.disconnect();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
       document.removeEventListener('pointerdown', onDocDown);

@@ -650,6 +650,8 @@ body[data-view="country"] .hud-rail { display: none; }
 
 /* 舞台：两屏高，里面钉住一个 100vh 的视口 */
 .stage { position: relative; height: 200vh; }
+/* 第一屏哨兵：只有几何意义，不可见、不拦事件 */
+.hero-zone { position: absolute; top: 0; left: 0; width: 100%; height: 100vh; pointer-events: none; }
 .pin {
   position: sticky; top: 0;
   height: 100vh;
