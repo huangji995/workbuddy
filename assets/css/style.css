@@ -161,40 +161,54 @@ button { font: inherit; color: inherit; }
   border-top-left-radius: 0; border-top-right-radius: 8px;
 }
 
-/* 右下角：全球宏观面板。极度贫困率只有全球口径（国家层面是抽样年），
-   所以不做图层，只用这块 HUD 说明「世界这一项真的在变好」。
-   左下角被年份数字占着，放右边这块空白，球体本身一点不挡。 */
-.hud-card--macro {
-  right: 0;
-  bottom: 84px;
-  width: 292px;
-  padding: 10px 13px 11px;
-  pointer-events: none;
+/* ---------- 顶部：全球宏观数据横幅 ----------
+   极度贫困率只有全球口径（国家层面是抽样年），做不成逐年图层，
+   所以不做地图与详情页，只用这条横幅说明「这一项世界真的在变好」。
+   位置在标题上方、横跨顶部，完全不挡地球。 */
+.macro-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px 16px;
+  max-width: 940px;
+  margin: 18px auto 0;
+  padding: 8px 18px;
+  border: 1px solid rgba(6, 181, 212, 0.22);
+  border-radius: 7px;
+  background: rgba(8, 18, 34, 0.5);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  backdrop-filter: blur(12px) saturate(130%);
+  box-shadow:
+    0 0 22px rgba(6, 181, 212, 0.08),
+    inset 0 1px 0 rgba(148, 197, 214, 0.07);
 }
-.hud-card--macro::after { left: -7px; right: auto; }
-.hud-card--macro::before {
-  left: auto; right: -1px;
-  border-left: 0; border-right: 1px solid var(--neon);
-  border-top-left-radius: 0; border-top-right-radius: 8px;
+/* 顶边一道光，读作「仪表盘上的一条读数」 */
+.macro-bar::before {
+  content: "";
+  position: absolute;
+  left: 14%; right: 14%; top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.6), transparent);
 }
-.macro-k {
-  display: block;
-  margin-bottom: 7px;
+.macro-bar-k {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.14em;
-  line-height: 1.4;
-  color: rgba(34, 211, 238, 0.78);
+  line-height: 1.5;
+  white-space: nowrap;
+  color: rgba(34, 211, 238, 0.82);
 }
 .macro-line {
-  margin: 0 0 6px;
+  margin: 0;
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 3px;
   font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.5;
   letter-spacing: 0.01em;
   color: #9FB4C7;
 }
@@ -207,14 +221,13 @@ button { font: inherit; color: inherit; }
 }
 .macro-line i {
   font-style: normal;
-  padding: 0 1px;
+  padding: 0 2px;
   color: rgba(34, 211, 238, 0.6);
 }
 .macro-note {
-  margin: 0;
   font-family: var(--mono);
-  font-size: 10px;
-  line-height: 1.55;
+  font-size: 10.5px;
+  line-height: 1.5;
   letter-spacing: 0.02em;
   color: #6E8299;
 }
@@ -330,6 +343,33 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.06em;
   color: #7A8CA3;
   pointer-events: none;
+}
+
+/* 地球右上角：打开宏观气泡图。位置让开右侧指标卡（top:40%）与下方提示 */
+.bub-open {
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 3;
+  padding: 7px 13px 6px;
+  border: 1px solid rgba(6, 181, 212, 0.34);
+  border-radius: 6px;
+  background: rgba(8, 18, 34, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: #7FE6F8;
+  cursor: pointer;
+  box-shadow: 0 0 18px rgba(6, 181, 212, 0.14);
+  transition: background 180ms ease, box-shadow 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+.bub-open:hover {
+  background: rgba(6, 181, 212, 0.18);
+  border-color: rgba(34, 211, 238, 0.6);
+  color: #CFFAFE;
+  box-shadow: 0 0 26px rgba(34, 211, 238, 0.32);
 }
 
 .globe-tip {
@@ -1144,12 +1184,7 @@ body[data-view="country"] .hud-rail { display: none; }
   50% { transform: translateY(4px); opacity: 1; }
 }
 
-/* ---------- 第 3 块：气泡图 ---------- */
-.story-bubble {
-  display: flex; flex-direction: column; gap: 14px;
-  padding: 9vh 5vw 6vh;
-  box-sizing: border-box;
-}
+/* ---------- 气泡图：全屏弹层 ---------- */
 /* 极简 HUD 标题：只有括号 + 一行字 */
 .st-hud-title {
   margin: 0; flex: none;
@@ -1169,7 +1204,127 @@ body[data-view="country"] .hud-rail { display: none; }
 .st-hud-title i:last-child { margin-left: -2px; }
 
 /* ---------- 气泡图组件 ---------- */
-.bub-root { display: flex; flex-direction: column; gap: 12px; height: calc(100vh - 220px); min-height: 340px; }
+/* 弹层本身：深色半透明 + 毛玻璃背景，中间一块仪表盘面板 */
+.bub-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 3vh 2vw;
+}
+.bub-modal[hidden] { display: none; }
+.bub-modal-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.78);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.bub-modal.is-on .bub-modal-bg { opacity: 1; }
+
+.bub-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(1240px, 96vw);
+  height: min(860px, 92vh);
+  padding: 14px 20px 16px;
+  box-sizing: border-box;
+  border: 1px solid rgba(6, 181, 212, 0.3);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(8, 20, 38, 0.96), rgba(3, 9, 22, 0.98));
+  box-shadow:
+    0 40px 90px rgba(0, 0, 0, 0.66),
+    inset 0 1px 0 rgba(148, 197, 214, 0.1),
+    0 0 0 1px rgba(2, 6, 23, 0.9);
+  opacity: 0;
+  transform: translateY(14px) scale(0.992);
+  transition: opacity 260ms ease, transform 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bub-modal.is-on .bub-panel { opacity: 1; transform: none; }
+/* 左下 / 右上取景折角，和四角 HUD 边框同一套语言 */
+.bub-panel::before, .bub-panel::after {
+  content: "";
+  position: absolute;
+  width: 14px; height: 14px;
+  border: 1px solid var(--neon);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.bub-panel::before { left: -1px; bottom: -1px; border-right: 0; border-top: 0; border-bottom-left-radius: 14px; }
+.bub-panel::after { right: -1px; top: -1px; border-left: 0; border-bottom: 0; border-top-right-radius: 14px; }
+
+.bub-panel-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 197, 214, 0.1);
+}
+.bub-sub {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+  color: #6E8299;
+}
+.bub-y-switch {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.bub-y-k {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: #64748B;
+  margin-right: 2px;
+}
+.bub-y-btn {
+  padding: 5px 11px 4px;
+  border: 1px solid rgba(6, 181, 212, 0.22);
+  border-radius: 6px;
+  background: rgba(8, 18, 34, 0.5);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: #9FB4C7;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.bub-y-btn:hover { color: #CFFAFE; border-color: rgba(34, 211, 238, 0.45); }
+.bub-y-btn.is-on {
+  color: #7FE6F8;
+  border-color: rgba(34, 211, 238, 0.62);
+  background: rgba(6, 181, 212, 0.16);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.22), inset 0 0 12px rgba(34, 211, 238, 0.08);
+}
+.bub-close {
+  padding: 5px 11px 4px;
+  border: 1px solid rgba(148, 197, 214, 0.24);
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  color: #94A3B8;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+.bub-close:hover { color: #FCA5A5; border-color: rgba(239, 68, 68, 0.55); background: rgba(239, 68, 68, 0.1); }
+
+/* 弹层里 root 撑满面板剩余高度，不再用 100vh 减法 */
+.bub-root { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.bub-panel .bub-root { flex: 1 1 auto; height: auto; }
 .bub-plot { position: relative; flex: 1 1 auto; min-height: 0; }
 .bub-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .bub-plot text { font-family: var(--mono); }
@@ -1236,6 +1391,36 @@ body[data-view="country"] .hud-rail { display: none; }
   display: flex; justify-content: space-between;
   font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; color: #7A8CA3;
 }
+
+/* 悬停读数：弹层里没有「当前国家」，靠它认泡 */
+.bub-tip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 10px 8px;
+  pointer-events: none;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  border-radius: 7px;
+  background: rgba(3, 9, 22, 0.94);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55), 0 0 20px rgba(34, 211, 238, 0.16);
+  white-space: nowrap;
+}
+.bub-tip[hidden] { display: none; }
+.bub-tip b {
+  font-family: var(--font);
+  font-size: 13px; font-weight: 600;
+  color: #E5F2FF;
+}
+.bub-tip span {
+  font-family: var(--mono);
+  font-size: 11px; letter-spacing: 0.02em;
+  color: #9FB4C7;
+}
+
+/* 弹层打开时锁住页面滚动 */
+body.bub-modal-open { overflow: hidden; }
 
 /* ---------- 结尾 ---------- */
 .story-tail { position: relative; padding: 90px 6vw 110px; }
@@ -1361,8 +1546,6 @@ body[data-view="country"] .hud-rail { display: none; }
   }
   .pin-tabs { top: 54px; padding: 0 5vw; }
   .ind-pick { top: 56px; }
-  .story-bubble { padding: 7vh 5vw 5vh; }
-  .bub-root { height: calc(100vh - 230px); }
 }
 
 @media (max-width: 720px) {
@@ -1380,9 +1563,7 @@ body[data-view="country"] .hud-rail { display: none; }
   .chart-sub { font-size: 11.5px; order: 3; flex-basis: 100%; margin-top: -2px; }
   .chart-delta { font-size: 16px; }
   .pin-chart { height: 40vh; bottom: 3vh; }
-  .story-bubble { padding: 5vh 4vw 4vh; }
   .st-hud-title { font-size: 13px; letter-spacing: 0.08em; gap: 6px; }
-  .bub-root { height: calc(100vh - 220px); min-height: 300px; }
   .bub-legend { gap: 5px 12px; font-size: 11px; }
   .bub-legend .bub-legend-size { display: none; }
   .bub-year b { font-size: 20px; }
@@ -1390,6 +1571,15 @@ body[data-view="country"] .hud-rail { display: none; }
   .bub-play { width: 30px; height: 30px; }
   .story-tail { padding: 56px 5vw 76px; }
   .pin-hint { font-size: 10px; letter-spacing: 0.2em; }
+  /* 弹层：手机端铺满，标题行让位给 Y 轴切换 */
+  .bub-modal { padding: 2vh 2vw; }
+  .bub-panel { width: 100%; height: 96vh; padding: 11px 12px 12px; gap: 8px; }
+  .bub-panel-head { gap: 6px 10px; padding-bottom: 8px; }
+  .bub-sub { display: none; }
+  .bub-y-switch { width: 100%; margin-left: 0; }
+  .bub-y-btn { font-size: 11px; padding: 4px 9px 3px; }
+  .bub-close { margin-left: auto; }
+  .bub-open { font-size: 11px; padding: 6px 11px 5px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1419,13 +1609,13 @@ body[data-view="country"] .site-foot { display: none; }
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 1180px) {
-  /* 两侧空间放不下悬浮卡（含宏观面板）：改为球体上方一排三格，宏观面板落到球下 */
+  /* 两侧空间放不下悬浮卡：改为球体上方一排三格 */
   .globe-zone { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
   .hud-card { position: static; width: auto; padding: 9px 11px; }
   .hud-card::before, .hud-card::after { display: none; }
   .globe-stage { grid-column: 1 / -1; margin-top: 10px; }
-  /* 宏观面板手机端铺满一行，落在地球下方 */
-  .hud-card--macro { grid-column: 1 / -1; width: auto; }
+  /* 气泡图按钮同样进流：球下一行居中 */
+  .bub-open { position: static; grid-column: 1 / -1; justify-self: center; margin-top: 10px; }
   .zone-hint { position: static; width: auto; margin: 2px 0 0; text-align: center; grid-column: 1 / -1; }
 }
 
@@ -1441,6 +1631,10 @@ body[data-view="country"] .site-foot { display: none; }
   .hero { padding: 30px 0 20px; }
   .hero h1 { font-size: 26px; }
   .lede { font-size: 16px; }
+  .macro-bar { margin-top: 12px; padding: 7px 12px; gap: 2px 10px; }
+  .macro-bar-k { font-size: 10px; letter-spacing: 0.1em; }
+  .macro-line { font-size: 11px; }
+  .macro-note { font-size: 9.5px; }
   .globe-year { left: 14px; bottom: 12px; }
   .globe-year b { font-size: 30px; }
   .zone-hint { display: none; }

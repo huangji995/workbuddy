@@ -40,6 +40,22 @@
       + '</aside>';
   }
 
+  /* 顶部导语必须跟着指标方向走：
+     负向指标（儿童死亡率）是「越深越危险」，正向指标（预期寿命 / 疫苗 / 电力 / 女性教育）
+     是「越亮越高」。以前这段写死成「星球一点点烧红」，
+     选到预期寿命时那句话是彻底反的。 */
+  function ledeHTML(ind) {
+    var name = '<b id="ledeInd">' + esc(ind.label) + '</b>';
+    if (ind.betterWhen === 'down') {
+      return '颜色代表各国 ' + name + '，<strong>颜色越深越危险</strong>。'
+        + '地球会自己转动，时间往回放，你能看到整颗星球一点点烧红；'
+        + '往前走，红色一点点褪去——点一个国家，看它走了多远。';
+    }
+    return '颜色代表各国 ' + name + '，<strong>颜色越亮代表程度越高</strong>。'
+      + '地球会自己转动，时间往回放，光亮一点点暗下去；'
+      + '往前走，整颗星球被慢慢点亮——点一个国家，看它走了多远。';
+  }
+
   function legendHTML(ind) {
     var invert = ind.betterWhen === 'up';
     var stops = U.rampStops(ind.thresholds, invert);
@@ -143,14 +159,27 @@
         + ' data-key="' + m.key + '">' + esc(m.short) + '</button>';
     }).join('');
 
+    var yOrder = (GPM.bubble && GPM.bubble.Y_ORDER) || ['lifeExp'];
+    var ySwitchHTML = '<span class="bub-y-k">Y 轴</span>' + yOrder.map(function (key) {
+      var mm = GPM.indicator(key);
+      var on = key === 'lifeExp';
+      return '<button class="bub-y-btn' + (on ? ' is-on' : '') + '" type="button" role="tab"'
+        + ' aria-selected="' + (on ? 'true' : 'false') + '" data-y="' + key + '">'
+        + esc(mm ? mm.short : key) + '</button>';
+    }).join('');
+
     mount.innerHTML = ''
       + '<section class="view view-map">'
+      /* 顶部细长横幅：极度贫困只有全球口径，放这里不挡地球 */
+      + '  <aside class="macro-bar reveal" style="--d:0ms" id="macroBar" aria-label="全球宏观数据">'
+      + '    <span class="macro-bar-k">[ 全球宏观数据 // GLOBAL MACRO ]</span>'
+      + '    <p class="macro-line">极度贫困人口比例：<b>1990 年 38%</b><i>→</i><b>2024 年 10%</b></p>'
+      + '    <span class="macro-note">[ 注：国家层面仅有抽样年份数据，故不在地球展示 ]</span>'
+      + '  </aside>'
       + '  <header class="hero hero--center">'
       + '    <p class="eyebrow reveal" style="--d:0ms">1990 — 2024 · 逐年回放</p>'
       + '    <h1 class="reveal" style="--d:60ms">全球进步地图</h1>'
-      + '    <p class="lede reveal" style="--d:120ms">颜色代表各国 <b id="ledeInd">' + esc(ind.label) + '</b>，'
-      + '      <strong>越烫越危险</strong>。地球会自己转动，时间往回放，你能看到整颗星球一点点烧红；'
-      + '      往前走，红色一点点褪去——点一个国家，看它走了多远。</p>'
+      + '    <p class="lede reveal" id="ledeBox" style="--d:120ms">' + ledeHTML(ind) + '</p>'
       + '  </header>'
       + '  <div class="ind-bar reveal" style="--d:150ms">'
       + '    <span class="ind-bar-k">指标</span>'
@@ -166,12 +195,9 @@
       + '        <div class="globe-year" id="globeYear"><b>1990</b><em>年</em></div>'
       + '        <div class="globe-tip" id="globeTip" hidden></div>'
       + '      </div>'
-      + '      <aside class="hud-card hud-card--macro" id="macroPanel" aria-label="全球宏观数据">'
-      + '        <span class="macro-k">[ 全球宏观数据 // GLOBAL MACRO ]</span>'
-      + '        <p class="macro-line">极度贫困人口比例：<b>1990 年 38%</b><i>→</i><b>2024 年 10%</b></p>'
-      + '        <p class="macro-note">[ 注：国家层面仅有抽样年份数据，故不在地球展示 ]</p>'
-      + '      </aside>'
       + '      <p class="zone-hint" id="globeHint">拖动旋转<br>点击国家看详情</p>'
+      + '      <button class="bub-open" id="bubOpen" type="button" aria-haspopup="dialog">'
+      + '        [ 展开全球宏观气泡图 ]</button>'
       + '    </div>'
       + '    <div class="timebar reveal" style="--d:300ms">'
       + '      <button class="play-btn" id="playBtn" type="button" aria-label="播放或暂停时间轴" aria-pressed="false">'
@@ -203,6 +229,21 @@
       + '      <div id="rankBest">' + rankHTML(lists.best, 'best') + '</div>'
       + '      <div class="panel-head panel-head-sub"><h2>仍然最高</h2><span class="panel-count">最新年份</span></div>'
       + '      <div id="rankNow">' + rankHTML(lists.now, 'now') + '</div>'
+      + '    </section>'
+      + '  </div>'
+      /* ================= 全球宏观气泡图：全屏弹层 ================= */
+      + '  <div class="bub-modal" id="bubModal" hidden>'
+      + '    <div class="bub-modal-bg" id="bubBackdrop"></div>'
+      + '    <section class="bub-panel" role="dialog" aria-modal="true" aria-labelledby="bubTitle">'
+      + '      <header class="bub-panel-head">'
+      + '        <p class="st-hud-title"><i aria-hidden="true">[</i><span id="bubTitle">全球宏观气泡图</span>'
+      + '          <i aria-hidden="true">]</i></p>'
+      + '        <p class="bub-sub" id="bubSub">横轴人均 GDP（对数）· 气泡面积 = 人口 · 颜色 = 地区</p>'
+      + '        <div class="bub-y-switch" id="bubYSwitch" role="tablist" aria-label="切换纵轴指标">'
+      + ySwitchHTML + '</div>'
+      + '        <button class="bub-close" id="bubClose" type="button" aria-label="关闭气泡图">[ X ]</button>'
+      + '      </header>'
+      + '      <div class="bub-root" id="bubRoot"></div>'
       + '    </section>'
       + '  </div>'
       + '</section>';
@@ -264,7 +305,7 @@
     var kLowU = mount.querySelector('#kLowU');
     var kHighK = mount.querySelector('#kHighK');
     var kLowK = mount.querySelector('#kLowK');
-    var ledeInd = mount.querySelector('#ledeInd');
+    var ledeBox = mount.querySelector('#ledeBox');
 
     /* 三块 HUD 的单位绑定就这一处：中位数用指标单位，两种计数固定「个」。
        以前是把 .hud-card em 一次性刷成 ind.unitShort，才出现「24 岁个国家」。 */
@@ -324,6 +365,86 @@
       },
       onClick: function (iso2) { location.hash = '#/c/' + iso2; }
     });
+
+    /* ---------- 全球宏观气泡图：全屏弹层（不跳页） ----------
+       点开才创建，关掉立刻销毁：既不用一进首页就算 192×34 的气泡，
+       也让每次打开都按当前窗口重新量尺寸。 */
+    var modal = mount.querySelector('#bubModal');
+    var bubRoot = mount.querySelector('#bubRoot');
+    var bubTitle = mount.querySelector('#bubTitle');
+    var ySwitch = mount.querySelector('#bubYSwitch');
+    var bubOpenBtn = mount.querySelector('#bubOpen');
+    var bubView = null;
+    var bubY = 'lifeExp';
+    var bubCloseTimer = null;
+
+    function bubTitleText(key) {
+      var meta = GPM.bubble && GPM.bubble.Y_META && GPM.bubble.Y_META[key];
+      return '全球各国：收入与' + (meta ? meta.short : '预期寿命') + '的变迁';
+    }
+
+    function openBubble() {
+      if (!modal || !GPM.bubble) return;
+      if (!modal.hidden) return;
+      clearTimeout(bubCloseTimer);
+      bubTitle.textContent = bubTitleText(bubY);
+      modal.hidden = false;
+      document.body.classList.add('bub-modal-open');
+      globe.setPaused(true);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          modal.classList.add('is-on');
+          if (!bubView) bubView = GPM.bubble.create(bubRoot, { yKey: bubY });
+          if (bubView) bubView.play();
+        });
+      });
+    }
+
+    function closeBubble(focusBack) {
+      if (!modal || modal.hidden) return;
+      modal.classList.remove('is-on');
+      document.body.classList.remove('bub-modal-open');
+      if (bubView) { bubView.stop(); bubView.destroy(); bubView = null; }
+      clearTimeout(bubCloseTimer);
+      bubCloseTimer = setTimeout(function () {
+        if (modal && !modal.classList.contains('is-on')) modal.hidden = true;
+      }, 240);
+      globe.setPaused(document.hidden || !visible);
+      if (focusBack && bubOpenBtn) {
+        try { bubOpenBtn.focus({ preventScroll: true }); } catch (e) { bubOpenBtn.focus(); }
+      }
+    }
+
+    if (bubOpenBtn) bubOpenBtn.addEventListener('click', openBubble);
+    var bubCloseBtn = mount.querySelector('#bubClose');
+    if (bubCloseBtn) bubCloseBtn.addEventListener('click', function () { closeBubble(true); });
+    var bubBackdrop = mount.querySelector('#bubBackdrop');
+    if (bubBackdrop) bubBackdrop.addEventListener('click', function () { closeBubble(true); });
+
+    if (ySwitch) {
+      ySwitch.addEventListener('click', function (e) {
+        var btn = e.target.closest ? e.target.closest('.bub-y-btn') : null;
+        if (!btn) return;
+        var key = btn.getAttribute('data-y');
+        if (!key || key === bubY) return;
+        bubY = key;
+        Array.prototype.forEach.call(ySwitch.querySelectorAll('.bub-y-btn'), function (b) {
+          var on = b.getAttribute('data-y') === key;
+          b.classList.toggle('is-on', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        bubTitle.textContent = bubTitleText(key);
+        if (bubView) bubView.setYKey(key);
+      });
+    }
+
+    function onModalKey(e) {
+      if (e.key === 'Escape' && modal && !modal.hidden) {
+        e.preventDefault();
+        closeBubble(true);
+      }
+    }
+    document.addEventListener('keydown', onModalKey);
 
     /* ---------- KPI：只在整数年变化 / 换指标时重算 ---------- */
     var hiCut = ind.thresholds[4];
@@ -396,6 +517,7 @@
       if (e.code !== 'Space' || e.target === range || /input|textarea/i.test(e.target.tagName)) return;
       if (!document.body.contains(canvas)) return;
       if (document.body.classList.contains('calib-open') || document.body.classList.contains('boot-open')) return;
+      if (document.body.classList.contains('bub-modal-open')) return;
       e.preventDefault();
       setPlaying(!playing);
     }
@@ -417,7 +539,8 @@
           btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
       }
-      if (ledeInd) ledeInd.textContent = ind.label;
+      /* 导语整段重写：负向指标说「越深越危险」，正向指标说「越亮代表程度越高」 */
+      if (ledeBox) ledeBox.innerHTML = ledeHTML(ind);
       mount.querySelector('#legendBox').innerHTML = legendHTML(ind);
       kHighK.textContent = '高于 ' + thresholdText(hiCut) + '的国家';
       kLowK.textContent = '低于 ' + thresholdText(loCut) + '的国家';
@@ -505,6 +628,10 @@
       offState();
       document.removeEventListener('visibilitychange', onVis);
       document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onModalKey);
+      clearTimeout(bubCloseTimer);
+      if (bubView) { bubView.destroy(); bubView = null; }
+      document.body.classList.remove('bub-modal-open');
       mount.removeEventListener('click', onListClick);
       globe.destroy();
       mount.innerHTML = '';

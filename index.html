@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>全球进步地图 · 世界正在变好的地方</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23020617'/%3E%3Cpath d='M5 23.5l6.5-7.5 4.5 3.5 9.5-11' fill='none' stroke='%2322D3EE' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='25.5' cy='8.5' r='2.2' fill='%2322D3EE'/%3E%3C/svg%3E">
-<meta name="description" content="用一张世界地图，看 1990 年以来各国 5 岁以下儿童死亡率与出生时预期寿命的变化。数据来自世界银行 WDI，全部离线内联。">
+<meta name="description" content="用一颗会自转的地球，看 1990 年以来各国儿童死亡率、预期寿命、疫苗率、电力与女性教育的真实变化。数据来自世界银行 WDI 与 UNDP HDR，全部离线内联。">
 <meta name="theme-color" content="#020617">
 <meta name="color-scheme" content="dark">
 <link rel="stylesheet" href="assets/css/style.css">
@@ -17,8 +17,8 @@
 </div>
 <main id="app" class="app"></main>
 <footer class="site-foot">
-  <p>数据：World Bank World Development Indicators（SH.DYN.MORT、SP.DYN.LE00.IN；气泡图另用 NY.GDP.PCAP.PP.CD、SP.POP.TOTL），构建时抓取快照并内联进页面，运行时不发起任何网络请求。</p>
-  <p>口径：5 岁以下儿童死亡率单位为「每 1000 活产儿」，出生时预期寿命单位为「岁」；各国最新可得年份不完全一致，页面中均标明实际年份。</p>
+  <p>数据：世界银行 WDI（SH.DYN.MORT、SP.DYN.LE00.IN、SH.IMM.IDPT、EG.ELC.ACCS.ZS）与 UNDP HDR 2025（女性受教育年限，经 OWID 整理）；气泡图另用 NY.GDP.PCAP.PP.CD、SP.POP.TOTL。全部在构建时抓取快照并内联进页面，运行时不发起任何网络请求。</p>
+  <p>口径：儿童死亡率单位为「每 1000 活产儿」，预期寿命与教育年限单位为「岁 / 年」，疫苗率与电力为「%」；极度贫困率只有全球口径（国家层面为抽样调查年），故只在顶部横幅展示。各国最新可得年份不完全一致，页面中均标明实际年份。</p>
 </footer>
 
 <script src="assets/vendor/d3.min.js"></script>

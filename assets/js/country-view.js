@@ -92,8 +92,6 @@
     var keys = GPM.INDICATORS.filter(function (m) { return avail[m.key]; })
       .map(function (m) { return m.key; });
 
-    var hasBubble = !!(window.__GPM_BUBBLE__ && window.__GPM_BUBBLE__.gdp[iso2]);
-
     if (!keys.length) {
       mount.innerHTML = '<section class="view view-country story-plain">'
         + '<a class="back" href="#/">← 返回地图</a>'
@@ -211,15 +209,6 @@
       + '          stroke-linejoin="round"/></svg></p>'
       + '    </div>'
       + '  </div>'
-
-      /* ================= 气泡图 ================= */
-      + (hasBubble
-        ? '  <section class="story-bubble" id="bubbleSec">'
-        + '    <p class="st-hud-title"><i aria-hidden="true">[</i><span>全球各国：收入与寿命的变迁</span>'
-        + '      <i aria-hidden="true">]</i></p>'
-        + '    <div class="bub-root" id="bubRoot"></div>'
-        + '  </section>'
-        : '')
 
       /* ================= 尾注 + 数据表 ================= */
       + '  <section class="story-tail">'
@@ -480,7 +469,8 @@
       if (headEl) headEl.textContent = (m.last.year - m.base.year) + ' 年，一条线。';
       tailNoteEl.innerHTML = '本节指标：<b>' + esc(ind.label) + '</b>（' + esc(ind.unitLong)
         + '），' + esc(ind.sourceNote || ('世界银行 WDI ' + ind.code))
-        + '。所有数值为构建时的快照，运行时不发起任何网络请求；气泡图另用人均 GDP（PPP）与总人口。';
+        + '。所有数值为构建时的快照，运行时不发起任何网络请求。'
+        + '想看各国收入与这项指标的关系，回地球点「展开全球宏观气泡图」。';
       tailTableEl.innerHTML = tableHTML(m, ind);
     }
 
@@ -640,46 +630,11 @@
       });
     });
 
-    /* ---------- 气泡图：进视口懒创建、只播一次 ---------- */
-    var bubble = null;
-    var bubblePlayed = false;
-
-    function ensureBubble() {
-      if (bubble) return;
-      var root = mount.querySelector('#bubRoot');
-      if (!root || !root.clientHeight) return;
-      bubble = GPM.bubble.create(root, { iso2: iso2, nameZh: c.nameZh });
-    }
-
-    var bubbleIO = null;
-    var bubbleSec = mount.querySelector('#bubbleSec');
-    if (bubbleSec) {
-      bubbleIO = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting && e.intersectionRatio >= 0.25) {
-            ensureBubble();
-            if (bubble && !bubblePlayed) { bubblePlayed = true; bubble.play(); }
-          } else if (bubble) {
-            bubble.stop();
-          }
-        });
-      }, { threshold: [0, 0.25] });
-      bubbleIO.observe(bubbleSec);
-    }
-
     /* ---------- 尺寸变化 ---------- */
     var rt = null;
     function onResize() {
       clearTimeout(rt);
-      rt = setTimeout(function () {
-        drawChart();
-        if (bubble) {
-          bubble.destroy();
-          bubble = null;
-          bubblePlayed = false;
-          ensureBubble();
-        }
-      }, 220);
+      rt = setTimeout(function () { drawChart(); }, 220);
     }
     window.addEventListener('resize', onResize);
 
@@ -691,8 +646,6 @@
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
       document.removeEventListener('pointerdown', onDocDown);
-      if (bubbleIO) bubbleIO.disconnect();
-      if (bubble) bubble.destroy();
       mount.innerHTML = '';
     };
   };

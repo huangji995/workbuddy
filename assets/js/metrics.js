@@ -39,10 +39,10 @@
       sourceNote: '世界银行 WDI EG.ELC.ACCS.ZS', sourceShort: '世界银行 WDI'
     },
     {
-      /* 口径已换：OWID 整理的 UNDP HDR 2025「25 岁以上女性平均受教育年数」，
+      /* 口径已换：OWID 整理的 UNDP HDR 2025 女性平均受教育年数，
          逐年、192 国、1990–2023。旧的 Barro-Lee（5 年一档、144 国）已弃用。 */
-      key: 'schooling', label: '女性平均受教育年限', short: '女性教育',
-      unit: '年', unitShort: '年', unitLong: '25 岁以上女性平均在校年数',
+      key: 'schooling', label: '女性教育(25-34岁)', short: '女性教育(25-34岁)',
+      unit: '年', unitShort: '年', unitLong: '25–34 岁女性平均在校年数',
       decimals: 1, betterWhen: 'up', color: '#60A5FA', code: '',
       thresholds: [0, 2, 4, 6, 8, 10, 13], maxGap: 2, source: 'indicators.js',
       sourceNote: 'UNDP HDR 2025（经 OWID 整理）', sourceShort: 'UNDP HDR 2025'
