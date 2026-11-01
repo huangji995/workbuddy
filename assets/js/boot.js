@@ -12,12 +12,11 @@
   var FADE_MS = 420;
 
   var LINES = [
-    { t: '[ GPM // GLOBAL PROGRESS RADAR ]', cls: 'boot-hd' },
-    { t: '> load world_bank_snapshot ....... ok', cls: '' },
-    { t: '> index 245 countries / 34 years .. ok', cls: '' },
-    { t: '> init globe + timeline .......... ready', cls: '' },
-    { t: '[ 灵感与数据来源：汉斯·罗斯林《事实》 ]', cls: 'boot-src' },
-    { t: '> enter', cls: 'boot-enter' }
+    { t: '[ 全球进步雷达 // GPM ]', cls: 'boot-hd' },
+    { t: '> 加载数据快照 ...... 正常', cls: '' },
+    { t: '> 索引 245 个国家 / 34 年跨度 ...... 正常', cls: '' },
+    { t: '> 初始化地球与时间轴 ...... 就绪', cls: '' },
+    { t: '[ 灵感与数据来源：汉斯·罗斯林《事实》 ]', cls: 'boot-src' }
   ];
 
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

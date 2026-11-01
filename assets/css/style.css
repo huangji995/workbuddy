@@ -857,68 +857,38 @@ body[data-view="country"] .hud-rail { display: none; }
   background: rgba(34, 211, 238, 0.55);
 }
 
-/* 起点 → 坠落 → 最新：一条竖着的对照 */
-.st-cmp { display: flex; flex-direction: column; align-items: center; }
-.st-from {
-  margin: 0; display: flex; align-items: baseline; gap: 9px;
-  transition: opacity 560ms ease-out;
-}
-.st-from-k {
-  font-family: var(--mono); font-size: 13.5px; letter-spacing: 0.18em;
-  color: var(--ink-3);
-}
-.st-from-k::after { content: "："; margin-left: 1px; color: rgba(148, 197, 214, 0.55); }
-.st-from-v {
-  font-family: var(--mono); font-weight: 700;
-  font-size: calc((1 - var(--p)) * clamp(21px, 2.1vw, 28px) + var(--p) * clamp(19px, 1.7vw, 23px));
-  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
-  color: var(--ink-2);
-}
-.st-from-v em {
-  font-style: normal; font-size: 0.46em; font-weight: 500;
-  margin-left: 4px; letter-spacing: 0.06em; color: var(--ink-3);
-}
+/* 单值结构：年份 + 巨大数字 + 发光下落箭头，竖着排 */
+.st-hero { display: flex; flex-direction: column; align-items: center; }
 
-/* 中间：一整条 SVG 画的连接线——竖线、辉光、箭头同一条渐变，不会断开 */
+/* 下方：一整条 SVG 画的发光箭头——永远朝下（时间的方向），光段沿线延伸 */
 .st-drop {
   --drop-h: 60px;
   position: relative;
   display: flex; align-items: center; justify-content: center;
   margin: 8px 0 0;
-  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-/* 指标整体在涨：箭头跟着朝上 */
-.story[data-dir="up"] .st-drop { transform: scaleY(-1); }
 .st-drop-svg {
   display: block;
   filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.55));
 }
-.st-drop::after {
-  content: ""; position: absolute; top: 0; left: 50%;
-  width: 3px; height: 3px; margin-left: -1.5px; border-radius: 50%;
-  background: #EAFBFF;
-  box-shadow: 0 0 9px 2px rgba(34, 211, 238, 0.85);
-  animation: stFallDot 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+/* 发光延伸：一段亮光沿着箭头线从起点流向现在，循环 */
+.st-flow {
+  stroke-dasharray: 13 51;
+  animation: stFlow 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
-@keyframes stFallDot {
-  0% { transform: translateY(0); opacity: 0; }
-  22% { opacity: 1; }
-  76% { transform: translateY(calc(var(--drop-h) - 12px)); opacity: 0; }
-  100% { transform: translateY(calc(var(--drop-h) - 12px)); opacity: 0; }
+@keyframes stFlow {
+  from { stroke-dashoffset: 64; opacity: 0.25; }
+  18%  { opacity: 1; }
+  to   { stroke-dashoffset: 0; opacity: 0.25; }
 }
 
-/* 终点：年份随数字一起跳，落定后亮起「今天 / 最新」 */
-.st-to { display: flex; flex-direction: column; align-items: center; }
 .st-tick {
   position: relative;
   margin: 0 0 2px; display: flex; align-items: baseline; gap: 4px;
   line-height: 1.3;
   font-family: var(--mono); font-size: 13px; letter-spacing: 0.14em;
   color: rgba(34, 211, 238, 0.72);
-  opacity: 0; transform: translateY(-4px);
-  transition: opacity 400ms ease-out, transform 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.is-rolling .st-tick, .is-settled .st-tick { opacity: 1; transform: none; }
 .st-tick b {
   font-family: var(--mono); font-size: 14.5px; font-weight: 700;
   letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
@@ -974,7 +944,6 @@ body[data-view="country"] .hud-rail { display: none; }
   38% { transform: scale(1.035); }
   100% { transform: scale(1); }
 }
-.is-settled .st-from { opacity: 0.66; }
 
 /* ---------- 折线层：第二屏从右侧滑出 ---------- */
 .pin-chart {
@@ -1263,7 +1232,6 @@ body[data-view="country"] .hud-rail { display: none; }
   .pick-menu { min-width: 208px; }
   .hero-tag { gap: 7px; }
   .st-big { gap: 6px; }
-  .st-from-k { font-size: 12.5px; }
   .st-drop { margin: 6px 0 0; --drop-h: 46px; }
   .st-tick b { font-size: 13.5px; letter-spacing: 0.12em; }
   .st-tick-now { font-size: 11.5px; padding: 2px 8px 1px; margin-left: 8px; }
@@ -1284,14 +1252,14 @@ body[data-view="country"] .hud-rail { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .story, .num-in, .hero-tag, .st-big b, .st-from, .st-tick-now, .st-drop,
+  .story, .num-in, .hero-tag, .st-big b, .st-tick-now, .st-drop,
   .ch-tail, .chart-delta, .tab, .pick-menu, .pin-chart, .pin-num {
     transition-duration: 1ms !important;
     transition-delay: 0ms !important;
   }
   .is-settled .st-big b,
   .ch-tail.is-on .ch-end, .ch-tail.is-on .ch-halo { animation: none; }
-  .st-drop::after, .pin-hint svg { display: none; }
+  .st-flow, .pin-hint svg { animation: none; }
 }
 
 /* ---------- 页脚 ---------- */
@@ -1773,11 +1741,14 @@ body.boot-open { overflow: hidden; }
   text-shadow: 0 0 18px rgba(34, 211, 238, 0.45);
 }
 .boot-line.boot-src {
-  margin-top: 10px;
-  color: #D6E2EF;
-  letter-spacing: 0.02em;
+  margin-top: 16px;
+  /* 其他日志行 12.5px × 1.5 */
+  font-size: 18.75px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #7FE6F8;
+  text-shadow: 0 0 22px rgba(34, 211, 238, 0.75), 0 0 64px rgba(34, 211, 238, 0.4);
 }
-.boot-line.boot-enter { margin-top: 4px; color: #46586C; }
 
 .boot-caret {
   display: block;

@@ -1,16 +1,23 @@
 /* 国家详情：双屏滚动叙事（Hero → Detail）+ 全局指标状态。
-   第 1 屏：屏幕正中一个巨大数字；第 2 屏：数字缩小左移，折线从右侧滑出。
-   两屏之间不是「锁死滚动」，就是普通滚动，进度完全由滚动位置决定，所以上滚必然可逆。 */
+   严格时间轴：进页只显示「国家 + 指标 + 起点值」，滚动才开始把数字从起点
+   跳到最新值；跳完之后，数字才缩到左栏、折线才滑出。两段进度都由滚动位置
+   直接算出（纯函数），上滚必然原路退回。 */
 (function () {
   'use strict';
   var GPM = (window.GPM = window.GPM || {});
   var U = GPM.util;
 
-  var DECOR = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* 滚动窗口（占整个 200vh 舞台的比例）：
+     数字跳动 0.03 → 0.44；几何过渡（缩左移 + 折线滑入）0.46 → 0.84。
+     中间留 0.02 的间隙，让「定格在 2024 今天」先站稳再过渡。 */
+  var NUM_A = 0.03, NUM_B = 0.44;
+  var GEO_A = 0.46, GEO_B = 0.84;
 
-  /* 动画节奏：先停 0.5 秒让人看清起点，再用 2.5 秒落到最新一年 */
-  var PAUSE = 500;
-  var DUR = 2500;
+  function clamp01(t) { return t < 0 ? 0 : t > 1 ? 1 : t; }
+  function win(p, a, b) { return clamp01((p - a) / (b - a)); }
+  function easeIO(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) {
@@ -141,33 +148,29 @@
       + '        <div class="tabs" role="tablist" aria-label="切换指标" id="tabs">' + tabsHTML + '</div>'
       + '      </div>'
 
-      /* 数字层：从正中缩到左栏 */
+      /* 数字层：从正中缩到左栏。单值结构：年份 + 巨大数字 + 发光下落箭头，
+         起点状态就是「1990 年 / 25.0」，滚动后同一位数字跳到「2024 今天 / 59.0」 */
       + '      <div class="pin-num" id="numStage">'
       + '        <div class="num-in">'
       + '          <p class="hero-tag"><b>[ ' + nameZh + ' ]</b><span id="heroInd"></span></p>'
-      + '          <div class="st-cmp">'
-      + '            <p class="st-from"><span class="st-from-k" id="stFromYear">1990 年</span>'
-      + '              <span class="st-from-v"><b id="stFromVal">—</b><em id="stFromUnit"></em></span></p>'
+      + '          <div class="st-hero">'
+      + '            <p class="st-tick"><b id="stYear">—</b><em>年</em>'
+      + '              <span class="st-tick-now" id="stNow" hidden>今天</span></p>'
+      + '            <div class="st-big"><b id="stBig">—</b><i class="st-unit" id="stUnit"></i></div>'
       + '            <span class="st-drop" aria-hidden="true">'
       + '              <svg class="st-drop-svg" width="18" height="60" viewBox="0 0 18 60" fill="none">'
       + '                <defs>'
       + '                  <linearGradient id="stDropGrad" x1="0" y1="0" x2="0" y2="60" gradientUnits="userSpaceOnUse">'
-      + '                    <stop offset="0" stop-color="#22D3EE" stop-opacity="0"/>'
-      + '                    <stop offset="0.4" stop-color="#22D3EE" stop-opacity="0.45"/>'
+      + '                    <stop offset="0" stop-color="#22D3EE" stop-opacity="0.06"/>'
       + '                    <stop offset="1" stop-color="#22D3EE" stop-opacity="1"/>'
       + '                  </linearGradient>'
       + '                </defs>'
-      + '                <path d="M9 0V52" stroke="#22D3EE" stroke-width="4" stroke-opacity="0.12" stroke-linecap="round"/>'
-      + '                <path d="M9 0V52" stroke="url(#stDropGrad)" stroke-width="1.2" stroke-linecap="round"/>'
-      + '                <path d="M4.6 46.8 9 52.6l4.4-5.8" stroke="url(#stDropGrad)" stroke-width="1.2"'
+      + '                <path d="M9 0V52" stroke="#22D3EE" stroke-width="3" stroke-opacity="0.14" stroke-linecap="round"/>'
+      + '                <path class="st-flow" d="M9 0V52" stroke="url(#stDropGrad)" stroke-width="2" stroke-linecap="round"/>'
+      + '                <path d="M4.6 46.8 9 52.6l4.4-5.8" stroke="url(#stDropGrad)" stroke-width="2"'
       + '                  stroke-linecap="round" stroke-linejoin="round"/>'
       + '              </svg>'
       + '            </span>'
-      + '            <div class="st-to">'
-      + '              <p class="st-tick"><b id="stYear">—</b><em>年</em>'
-      + '                <span class="st-tick-now" id="stNow">今天</span></p>'
-      + '              <div class="st-big"><b id="stBig">—</b><i class="st-unit" id="stUnit"></i></div>'
-      + '            </div>'
       + '          </div>'
       + '        </div>'
       + '      </div>'
@@ -225,9 +228,6 @@
     var indPick = mount.querySelector('#indPick');
     var bigEl = mount.querySelector('#stBig');
     var yearEl = mount.querySelector('#stYear');
-    var fromYearEl = mount.querySelector('#stFromYear');
-    var fromValEl = mount.querySelector('#stFromVal');
-    var fromUnitEl = mount.querySelector('#stFromUnit');
     var unitEl = mount.querySelector('#stUnit');
     var indEl = mount.querySelector('#heroInd');
     var nowEl = mount.querySelector('#stNow');
@@ -241,7 +241,6 @@
     var m = metrics[sel];
     var ind = GPM.indicator(sel);
     var chartView = null;
-    var raf = null;
     var progress = 0;
     var swapToken = 0;
     var menuOpen = false;
@@ -249,58 +248,23 @@
     function setNum(v) { bigEl.textContent = numText(v, ind.decimals); }
     function setYear(y) { yearEl.textContent = String(y); }
 
-    function paintBase() {
-      fromYearEl.textContent = m.base.year + ' 年';
-      fromValEl.textContent = U.fmt(m.base.value, ind.decimals);
-      fromUnitEl.textContent = ind.unit;
-      setNum(m.base.value);
-      setYear(m.base.year);
-      progress = 0;
-      if (chartView) chartView.setProgress(0);
-    }
-
-    function settle() {
-      story.classList.remove('is-rolling');
-      story.classList.add('is-settled');
-      setNum(m.last.value);
-      setYear(m.last.year);
-      progress = 1;
-      if (chartView) chartView.setProgress(1);
-      /* 最新年份不在今年附近时说「最新」，别硬说「今天」 */
-      nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
-      nowEl.hidden = false;
-    }
-
-    function stopAnim() {
-      if (raf) { cancelAnimationFrame(raf); raf = null; }
-    }
-
-    function play() {
-      stopAnim();
-      if (DECOR) { settle(); return; }
-      story.classList.remove('is-settled');
-      story.classList.add('is-rolling');
-      nowEl.hidden = true;
-      paintBase();
-      var from = m.base.value;
-      var to = m.last.value;
-      var y0 = m.base.year;
-      var y1 = m.last.year;
-      var t0 = 0;
-      function step(ts) {
-        if (!t0) t0 = ts;
-        var el = ts - t0;
-        if (el < PAUSE) { raf = requestAnimationFrame(step); return; }
-        var t = Math.min(1, (el - PAUSE) / DUR);
-        var e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-        progress = e;
-        setNum(from + (to - from) * e);
-        setYear(Math.round(y0 + (y1 - y0) * e));
-        if (chartView) chartView.setProgress(e);
-        if (t < 1) raf = requestAnimationFrame(step);
-        else { raf = null; settle(); }
+    /* 滚动 → 数字时间轴：0 = 起点定格，1 = 落定在最新一年。
+       只由 scrollP 推导，进页时不播放任何东西，滚动才开始跳。 */
+    function applyNum() {
+      var t = win(scrollP, NUM_A, NUM_B);
+      var e = easeIO(t);
+      progress = e;
+      setNum(m.base.value + (m.last.value - m.base.value) * e);
+      setYear(Math.round(m.base.year + (m.last.year - m.base.year) * e));
+      if (chartView) chartView.setProgress(e);
+      var settled = t >= 1;
+      story.classList.toggle('is-rolling', t > 0 && !settled);
+      story.classList.toggle('is-settled', settled);
+      nowEl.hidden = !settled;
+      if (settled) {
+        /* 最新年份不在今年附近时说「最新」，别硬说「今天」 */
+        nowEl.textContent = m.last.year >= 2023 ? '今天' : '最新';
       }
-      raf = requestAnimationFrame(step);
     }
 
     /* ---------- 折线 ---------- */
@@ -343,7 +307,6 @@
 
       var better = GPM.isBetter(ind, m.delta);
       story.dataset.trend = better === null ? 'flat' : better ? 'up' : 'down';
-      story.dataset.dir = m.delta < 0 ? 'down' : 'up';
       deltaEl.classList.toggle('is-good', better === true);
       deltaEl.classList.toggle('is-bad', better === false);
 
@@ -383,13 +346,14 @@
       pickBtn.setAttribute('aria-expanded', 'false');
     }
 
-    /* 换指标：淡出 → 换数据重画 → 淡入 → 重新播跳动 */
+    /* 换指标：淡出 → 换数据重画 → 淡入。数字回到哪里由当前滚动位置决定：
+       在第一屏顶部切换 = 回到新指标的起点，滚动时从新起点重新跳；
+       已经滚到第二屏 = 直接显示新指标的最新值。 */
     function applyIndicator(key) {
       sel = key;
       m = metrics[key];
       ind = GPM.indicator(key);
       syncControls();
-      stopAnim();
       var my = ++swapToken;
       numStage.classList.add('is-swap');
       chartStage.classList.add('is-swap');
@@ -399,11 +363,10 @@
         nowEl.hidden = true;
         applyMeta();
         drawChart();
-        paintBase();
         numStage.classList.remove('is-swap');
         chartStage.classList.remove('is-swap');
-        play();
-      }, DECOR ? 0 : 170);
+        applyNum();
+      }, 170);
     }
 
     function choose(key) {
@@ -446,20 +409,23 @@
     }
     document.addEventListener('pointerdown', onDocDown);
 
-    /* ---------- 滚动进度：0 = 巨大数字，1 = 左数字 + 右折线 ---------- */
+    /* ---------- 滚动进度：scrollP 是原始滚动位置（0→1），
+       --p 是几何过渡进度（第一屏保持 0，数字跳完才开始过渡到第二屏） ---------- */
     var scrollP = 0;
     var heroMode = true;
     var ticking = false;
 
-    function setP(v) {
-      scrollP = v < 0 ? 0 : v > 1 ? 1 : v;
-      pin.style.setProperty('--p', scrollP.toFixed(4));
+    function setP(p) {
+      scrollP = clamp01(p);
+      var g = easeIO(win(scrollP, GEO_A, GEO_B));
+      pin.style.setProperty('--p', g.toFixed(4));
       var hero = scrollP < 0.52;
       if (hero !== heroMode) {
         heroMode = hero;
         story.dataset.scr = hero ? 'hero' : 'detail';
         if (!hero) closeMenu();
       }
+      applyNum();
     }
 
     function measure() {
@@ -480,13 +446,12 @@
     syncControls();
     applyMeta();
     drawChart();
-    paintBase();
 
-    /* 路由在这一帧之后才把页面滚回顶部，所以量进度要等一帧，避免开门就闪第二屏 */
+    /* 路由在这一帧之后才把页面滚回顶部，所以量进度要等一帧。
+       不播放任何动画：applyNum 由滚动位置算出，进页即起点状态。 */
     requestAnimationFrame(function () {
       measure();
       story.classList.add('is-in');
-      play();
     });
 
     /* ---------- 气泡图：进视口懒创建、只播一次 ---------- */
@@ -535,7 +500,6 @@
 
     return function cleanup() {
       clearTimeout(rt);
-      stopAnim();
       offState();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
