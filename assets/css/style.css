@@ -161,6 +161,64 @@ button { font: inherit; color: inherit; }
   border-top-left-radius: 0; border-top-right-radius: 8px;
 }
 
+/* 右下角：全球宏观面板。极度贫困率只有全球口径（国家层面是抽样年），
+   所以不做图层，只用这块 HUD 说明「世界这一项真的在变好」。
+   左下角被年份数字占着，放右边这块空白，球体本身一点不挡。 */
+.hud-card--macro {
+  right: 0;
+  bottom: 84px;
+  width: 292px;
+  padding: 10px 13px 11px;
+  pointer-events: none;
+}
+.hud-card--macro::after { left: -7px; right: auto; }
+.hud-card--macro::before {
+  left: auto; right: -1px;
+  border-left: 0; border-right: 1px solid var(--neon);
+  border-top-left-radius: 0; border-top-right-radius: 8px;
+}
+.macro-k {
+  display: block;
+  margin-bottom: 7px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  color: rgba(34, 211, 238, 0.78);
+}
+.macro-line {
+  margin: 0 0 6px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.55;
+  letter-spacing: 0.01em;
+  color: #9FB4C7;
+}
+.macro-line b {
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: #7FE6F8;
+  text-shadow: 0 0 12px rgba(34, 211, 238, 0.45);
+}
+.macro-line i {
+  font-style: normal;
+  padding: 0 1px;
+  color: rgba(34, 211, 238, 0.6);
+}
+.macro-note {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  color: #6E8299;
+}
+
 .hud-card-k {
   display: block;
   font-family: var(--mono);
@@ -1360,12 +1418,14 @@ body[data-view="country"] .hud-rail { display: none; }
 body[data-view="country"] .site-foot { display: none; }
 
 /* ---------- 响应式 ---------- */
-@media (max-width: 1020px) {
-  /* 两侧空间放不下悬浮卡：改为球体上方一排三格 */
+@media (max-width: 1180px) {
+  /* 两侧空间放不下悬浮卡（含宏观面板）：改为球体上方一排三格，宏观面板落到球下 */
   .globe-zone { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
   .hud-card { position: static; width: auto; padding: 9px 11px; }
   .hud-card::before, .hud-card::after { display: none; }
   .globe-stage { grid-column: 1 / -1; margin-top: 10px; }
+  /* 宏观面板手机端铺满一行，落在地球下方 */
+  .hud-card--macro { grid-column: 1 / -1; width: auto; }
   .zone-hint { position: static; width: auto; margin: 2px 0 0; text-align: center; grid-column: 1 / -1; }
 }
 
@@ -1649,6 +1709,16 @@ body.calib-open { overflow: hidden; }
 }
 .calib-feedback.is-ok { color: #86EFAC; }
 .calib-feedback.is-no { color: #FCA5A5; }
+/* 贫困题专属：指向首页左下角的宏观面板，比正文再小一号 */
+.calib-feedback-more {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #7DD3FC;
+  opacity: 0.88;
+}
+.calib-feedback.is-no .calib-feedback-more { color: #93C5FD; }
 @keyframes calibFbIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: none; }

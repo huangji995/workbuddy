@@ -100,7 +100,7 @@
         + '<header class="country-head"><h1>' + nameZh + '</h1>'
         + '<p class="country-meta">' + esc([c.nameEn, c.region].filter(Boolean).join(' · ')) + '</p></header>'
         + '<div class="notice"><strong>这个地区没有可展示的数据。</strong>'
-        + '<p>世界银行 WDI 未收录' + nameZh + '的这些指标，所以这里不做任何估算或填充，地图上也保持中性灰。</p>'
+        + '<p>数据源未收录' + nameZh + '的这些指标，所以这里不做任何估算或填充，地图上也保持中性灰。</p>'
         + '<p class="notice-more">本页共收录 ' + D.meta.countriesTotal + ' 个国家与地区，其中 '
         + D.meta.countriesWithData + ' 个有儿童死亡率数据。'
         + '<a class="notice-link" href="#/">回到地图选一个 →</a></p></div>'
@@ -479,7 +479,7 @@
       var headEl = mount.querySelector('#tailHead');
       if (headEl) headEl.textContent = (m.last.year - m.base.year) + ' 年，一条线。';
       tailNoteEl.innerHTML = '本节指标：<b>' + esc(ind.label) + '</b>（' + esc(ind.unitLong)
-        + '），世界银行 WDI ' + esc(ind.code)
+        + '），' + esc(ind.sourceNote || ('世界银行 WDI ' + ind.code))
         + '。所有数值为构建时的快照，运行时不发起任何网络请求；气泡图另用人均 GDP（PPP）与总人口。';
       tailTableEl.innerHTML = tableHTML(m, ind);
     }

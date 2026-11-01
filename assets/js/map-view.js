@@ -30,10 +30,12 @@
     return out;
   }
 
+  /* 单位槽位单独给 id（valueId + 'U'）：中位数用指标单位，
+     两侧的「高于/低于 X 的国家」是计数，永远写死「个」，两者彻底解耦。 */
   function hudCard(mod, delay, labelId, label, valueId, note) {
     return '<aside class="hud-card hud-card--' + mod + ' reveal" style="--d:' + delay + 'ms">'
       + '<span class="hud-card-k" id="' + labelId + '">' + label + '</span>'
-      + '<span class="hud-card-v"><b id="' + valueId + '">—</b><em>—</em></span>'
+      + '<span class="hud-card-v"><b id="' + valueId + '">—</b><em id="' + valueId + 'U">—</em></span>'
       + (note ? '<span class="hud-card-note">' + note + '</span>' : '')
       + '</aside>';
   }
@@ -52,7 +54,7 @@
       + '<div class="legend-bar"><i style="background:linear-gradient(90deg,' + grad + ')"></i>'
       + '<div class="legend-ticks">' + ticks + '</div></div>'
       + '<p class="legend-nodata"><i style="background:' + GPM.PALETTE.noData + '"></i><span>暂无数据</span>'
-      + '<em>世界银行 WDI 未收录</em></p>';
+      + '<em>' + esc(ind.sourceShort || '世界银行 WDI') + ' 未收录</em></p>';
   }
 
   GPM.renderMapView = function (mount) {
@@ -164,6 +166,11 @@
       + '        <div class="globe-year" id="globeYear"><b>1990</b><em>年</em></div>'
       + '        <div class="globe-tip" id="globeTip" hidden></div>'
       + '      </div>'
+      + '      <aside class="hud-card hud-card--macro" id="macroPanel" aria-label="全球宏观数据">'
+      + '        <span class="macro-k">[ 全球宏观数据 // GLOBAL MACRO ]</span>'
+      + '        <p class="macro-line">极度贫困人口比例：<b>1990 年 38%</b><i>→</i><b>2024 年 10%</b></p>'
+      + '        <p class="macro-note">[ 注：国家层面仅有抽样年份数据，故不在地球展示 ]</p>'
+      + '      </aside>'
       + '      <p class="zone-hint" id="globeHint">拖动旋转<br>点击国家看详情</p>'
       + '    </div>'
       + '    <div class="timebar reveal" style="--d:300ms">'
@@ -252,9 +259,20 @@
     var kMed = mount.querySelector('#kMed');
     var kHigh = mount.querySelector('#kHigh');
     var kLow = mount.querySelector('#kLow');
+    var kMedU = mount.querySelector('#kMedU');
+    var kHighU = mount.querySelector('#kHighU');
+    var kLowU = mount.querySelector('#kLowU');
     var kHighK = mount.querySelector('#kHighK');
     var kLowK = mount.querySelector('#kLowK');
     var ledeInd = mount.querySelector('#ledeInd');
+
+    /* 三块 HUD 的单位绑定就这一处：中位数用指标单位，两种计数固定「个」。
+       以前是把 .hud-card em 一次性刷成 ind.unitShort，才出现「24 岁个国家」。 */
+    function syncUnits() {
+      if (kMedU) kMedU.textContent = ind.unitShort;
+      if (kHighU) kHighU.textContent = '个';
+      if (kLowU) kLowU.textContent = '个';
+    }
 
     var year = YEAR_END;
     var playing = !reduces;
@@ -403,9 +421,7 @@
       mount.querySelector('#legendBox').innerHTML = legendHTML(ind);
       kHighK.textContent = '高于 ' + thresholdText(hiCut) + '的国家';
       kLowK.textContent = '低于 ' + thresholdText(loCut) + '的国家';
-      Array.prototype.forEach.call(mount.querySelectorAll('.hud-card em'), function (el) {
-        el.textContent = ind.unitShort;
-      });
+      syncUnits();
       listBox.innerHTML = sorted.map(rowHTML).join('');
       mount.querySelector('#countData').textContent = withData().length + ' 个有数据';
       mount.querySelector('#rankBest').innerHTML = rankHTML(lists.best, 'best');
@@ -429,9 +445,7 @@
     /* 初始化 HUD 文案与单位（首屏静态标签是泛化的） */
     kHighK.textContent = '高于 ' + thresholdText(hiCut) + '的国家';
     kLowK.textContent = '低于 ' + thresholdText(loCut) + '的国家';
-    Array.prototype.forEach.call(mount.querySelectorAll('.hud-card em'), function (el) {
-      el.textContent = ind.unitShort;
-    });
+    syncUnits();
 
     /* ---------- 主循环 ---------- */
     function tick(t) {

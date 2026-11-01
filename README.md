@@ -37,7 +37,11 @@ npx serve .        # 或 python -m http.server 8080
 - **切换指标**：地球上方一排胶囊（儿童死亡率 / 预期寿命 / 疫苗率 / 电力 / 女性教育），地图着色、图例、榜单、列表、三个 KPI 一起换
 - **点击**国家：进入双屏详情页——正中巨大数字 → 滚动后数字缩到左栏、折线滑出 → Gapminder 气泡图。详情页默认继承你在地球上选中的指标
 - **时间轴**：播放/暂停（空格键也行），或直接拖到任意年份；播完停在 2024，稍候自动淡出重播
-- 顶部三张 KPI 卡（中位数 / 高于高位的国家数 / 低于低位的国家数）随年份与指标实时重算
+- 顶部三张 KPI 卡（中位数 / 高于高位的国家数 / 低于低位的国家数）随年份与指标实时重算；
+  中位数跟指标单位（`8.7 年` / `74.0 岁` / `93.0 %`），两种计数永远写作 `132 个`
+- **全球宏观面板**：地球右下角一块毛玻璃 HUD，写死「极度贫困人口比例：1990 年 38% → 2024 年 10%」。
+  极度贫困率只有全球口径（国家层面是抽样年，中位 8 个观测点、只有 26 国有 2024 值），
+  做不成逐年图层，所以只在宏观面板里讲这一条，不做成地图与详情页
 - **开场启动日志**：深空底上逐行打字（含「灵感与数据来源：汉斯·罗斯林《事实》」），点击或任意按键跳过
 - **开场直觉测试**：启动日志之后弹《事实》原书 5 道单选题（选项每次打乱，答错会点出对应的思维本能）；右上角 `[ Skip >> ]` 或 Esc 可跳过
 
@@ -67,6 +71,8 @@ data/bubble.js                人均 GDP（PPP）与总人口快照（挂 window
 data/indicators.js            疫苗率 / 电力 / 女性教育快照（挂 window.__GPM_IND__）
 data/geo.js                   国界 GeoJSON（挂 window.__GPM_GEO__，Natural Earth 110m）
 scripts/build-data.mjs        WDI 数据重建（开发期一次性运行，需要网络）
+scripts/build-indicators.mjs  疫苗率 / 电力序列重建
+scripts/build-schooling.mjs   女性受教育年限序列重建（OWID · UNDP HDR 2025）
 scripts/build-bubble.mjs      气泡图数据重建：NY.GDP.PCAP.PP.CD + SP.POP.TOTL
 scripts/build-indicators.mjs  补充指标重建：SH.IMM.IDPT / EG.ELC.ACCS.ZS / BAR.SCHL.15UP.FE
 scripts/build-geo.mjs         国界重建：world-atlas TopoJSON → GeoJSON → data/geo.js
@@ -169,16 +175,18 @@ scripts/fetch-remote.mjs      命令行被墙时用浏览器抓取远程文本�
 
 ### 指标（5 个，全部按国家拆开）
 
-| 指标 | 单位 | WDI | 覆盖 |
+| 指标 | 单位 | 数据源 | 覆盖 |
 |---|---|---|---|
-| 5岁以下儿童死亡率 | ‰ | `SH.DYN.MORT` | 196 国 |
-| 预期寿命 | 岁 | `SP.DYN.LE00.IN` | 215 国 |
-| 一岁儿童疫苗接种率 | % | `SH.IMM.IDPT` | 193 国 |
-| 电力可及率 | % | `EG.ELC.ACCS.ZS` | 214 国 |
-| 女性平均受教育年限 | 年 | `BAR.SCHL.15UP.FE` | 144 国（5 年一档） |
+| 5岁以下儿童死亡率 | ‰ | 世行 WDI `SH.DYN.MORT` | 196 国，逐年 |
+| 预期寿命 | 岁 | 世行 WDI `SP.DYN.LE00.IN` | 215 国，逐年 |
+| 一岁儿童疫苗接种率 | % | 世行 WDI `SH.IMM.IDPT` | 193 国，逐年 |
+| 电力可及率 | % | 世行 WDI `EG.ELC.ACCS.ZS` | 214 国，逐年 |
+| 女性平均受教育年限 | 年 | UNDP HDR 2025（OWID 整理）`mean-years-of-schooling-female` | 192 国，逐年 1990–2023 |
 
-前两个在 `data/data.js`，后三个由 `scripts/build-indicators.mjs` 抓成 `data/indicators.js`
-（一次 `country/all` 请求拿全量，构建期抓取，运行时零请求）。某个国家缺哪项，那颗胶囊就置灰、
+前两个在 `data/data.js`；疫苗率与电力由 `scripts/build-indicators.mjs` 抓 WDI 成 `data/indicators.js`；
+女性教育改用 `scripts/build-schooling.mjs` 从 OWID 的 HDR 2025 序列重建（旧的 Barro-Lee
+`BAR.SCHL.15UP.FE` 已被替换：5 年一档、144 国、只到 2015 前后，折线是折的）。
+全部构建期抓取，运行时零请求。某个国家缺哪项，那颗胶囊就置灰、
 进不去；一个都没有的国家退回纯文字页。菜单与数据映射里都不再包含「0—14 岁人口占比」。
 
 ### 状态：一份指标，两处控件

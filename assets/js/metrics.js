@@ -14,31 +14,38 @@
       key: 'u5mr', label: '5岁以下儿童死亡率', short: '儿童死亡率',
       unit: '‰', unitShort: '‰', unitLong: '每 1000 活产儿',
       decimals: 1, betterWhen: 'down', color: '#22D3EE', code: 'SH.DYN.MORT',
-      thresholds: [0, 5, 10, 20, 40, 80, 150], source: 'data.js'
+      thresholds: [0, 5, 10, 20, 40, 80, 150], source: 'data.js',
+      sourceNote: '世界银行 WDI SH.DYN.MORT', sourceShort: '世界银行 WDI'
     },
     {
       key: 'lifeExp', label: '预期寿命', short: '预期寿命',
       unit: '岁', unitShort: '岁', unitLong: '出生时预期寿命',
       decimals: 1, betterWhen: 'up', color: '#A78BFA', code: 'SP.DYN.LE00.IN',
-      thresholds: [40, 55, 62, 68, 74, 80, 90], source: 'data.js'
+      thresholds: [40, 55, 62, 68, 74, 80, 90], source: 'data.js',
+      sourceNote: '世界银行 WDI SP.DYN.LE00.IN', sourceShort: '世界银行 WDI'
     },
     {
       key: 'dtp3', label: '一岁儿童疫苗接种率', short: '疫苗率',
       unit: '%', unitShort: '%', unitLong: 'DTP3 疫苗，1 岁前',
       decimals: 1, betterWhen: 'up', color: '#34D399', code: 'SH.IMM.IDPT',
-      thresholds: [0, 40, 60, 75, 85, 92, 97], source: 'indicators.js'
+      thresholds: [0, 40, 60, 75, 85, 92, 97], source: 'indicators.js',
+      sourceNote: '世界银行 WDI SH.IMM.IDPT', sourceShort: '世界银行 WDI'
     },
     {
       key: 'electricity', label: '电力可及率', short: '电力',
       unit: '%', unitShort: '%', unitLong: '能用上电的人口比例',
       decimals: 1, betterWhen: 'up', color: '#FBBF24', code: 'EG.ELC.ACCS.ZS',
-      thresholds: [0, 30, 55, 75, 88, 96, 100], source: 'indicators.js'
+      thresholds: [0, 30, 55, 75, 88, 96, 100], source: 'indicators.js',
+      sourceNote: '世界银行 WDI EG.ELC.ACCS.ZS', sourceShort: '世界银行 WDI'
     },
     {
+      /* 口径已换：OWID 整理的 UNDP HDR 2025「25 岁以上女性平均受教育年数」，
+         逐年、192 国、1990–2023。旧的 Barro-Lee（5 年一档、144 国）已弃用。 */
       key: 'schooling', label: '女性平均受教育年限', short: '女性教育',
-      unit: '年', unitShort: '年', unitLong: '25 岁以上女性，Barro-Lee',
-      decimals: 1, betterWhen: 'up', color: '#60A5FA', code: 'BAR.SCHL.15UP.FE',
-      thresholds: [0, 2, 4, 6, 8, 10, 13], maxGap: 6, source: 'indicators.js'
+      unit: '年', unitShort: '年', unitLong: '25 岁以上女性平均在校年数',
+      decimals: 1, betterWhen: 'up', color: '#60A5FA', code: '',
+      thresholds: [0, 2, 4, 6, 8, 10, 13], maxGap: 2, source: 'indicators.js',
+      sourceNote: 'UNDP HDR 2025（经 OWID 整理）', sourceShort: 'UNDP HDR 2025'
     }
   ];
 

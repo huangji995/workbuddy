@@ -37,7 +37,9 @@
       ],
       truth: '几乎减半',
       right: '[ 校准成功：你避开了“负面思维本能” ]',
-      wrong: '[ 警告：检测到“负面思维本能”干扰，人类往往只关注坏消息 ]'
+      wrong: '[ 警告：检测到“负面思维本能”干扰，人类往往只关注坏消息 ]',
+      /* 贫困只有全球口径，不在图层里，指一下首页左下角的宏观面板 */
+      more: '[ 请在地球右侧的宏观数据面板中查看该项真实数据 ]'
     },
     {
       stem: '全世界人口的预期寿命现在是多少岁？',
@@ -95,7 +97,8 @@
         }),
         truth: q.truth,
         right: q.right,
-        wrong: q.wrong
+        wrong: q.wrong,
+        more: q.more || ''
       };
     });
   }
@@ -210,8 +213,10 @@
     }
 
     var fb = node.querySelector('#calibFeedback');
-    fb.textContent = q.options[pick].ok ? q.right : q.wrong;
-    fb.classList.add(q.options[pick].ok ? 'is-ok' : 'is-no');
+    var okPick = q.options[pick].ok;
+    fb.innerHTML = esc(okPick ? q.right : q.wrong)
+      + (q.more ? '<span class="calib-feedback-more">' + esc(q.more) + '</span>' : '');
+    fb.classList.add(okPick ? 'is-ok' : 'is-no');
 
     timer = setTimeout(function () {
       state.step++;
